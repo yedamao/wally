@@ -16,6 +16,10 @@ let package = Package(
             exclude: ["Info.plist"],
             resources: [
                 .copy("Resources/AppIcon.svg"),
+            ],
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("WebKit"),
             ]
         ),
         .testTarget(

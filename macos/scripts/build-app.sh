@@ -116,15 +116,20 @@ fi
 # PkgInfo
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
+# Always sign: unsigned .app bundles often fail to show a UI under modern macOS.
 if [[ -n "$SIGN_IDENTITY" ]]; then
   echo "==> codesign ($SIGN_IDENTITY)"
   codesign --force --deep --options runtime \
     --entitlements "$APP_SRC/Wally.entitlements" \
     --sign "$SIGN_IDENTITY" "$APP"
-elif [[ "$ADHOC_SIGN" -eq 1 ]]; then
+else
   echo "==> ad-hoc codesign"
   codesign --force --deep --sign - "$APP"
 fi
 
+# Drop quarantine so `open` does not silently refuse a freshly built app.
+xattr -cr "$APP" 2>/dev/null || true
+
 echo "Built $APP"
 echo "Open with: open \"$APP\""
+echo "If the window still does not appear, check: ~/Library/Logs/Wally/launch.log"

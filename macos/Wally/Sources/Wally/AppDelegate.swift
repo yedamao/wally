@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let gateway = GatewayController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LaunchLog.write("applicationDidFinishLaunching")
         NSApp.setActivationPolicy(.regular)
         NSApp.mainMenu = buildMenu()
 
@@ -20,12 +21,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindow = window
         window.showWindow(nil)
         window.present()
+        LaunchLog.write("window presented frame=\(String(describing: window.window?.frame))")
 
         gateway.start()
+        LaunchLog.write("gateway.start() called")
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
         mainWindow?.present()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            mainWindow?.present()
+        }
+        return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -33,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        LaunchLog.write("applicationWillTerminate")
         NotificationCenter.default.post(name: .wallyWillTerminate, object: nil)
         gateway.stop()
     }
@@ -47,7 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "About Wally", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Hide Wally", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h").keyEquivalentModifierMask = [.command, .option]
+        let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit Wally", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -69,10 +81,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = NSMenu(title: "View")
         viewMenuItem.submenu = viewMenu
         viewMenu.addItem(withTitle: "Reload WebUI", action: #selector(reloadWebUI(_:)), keyEquivalent: "r")
-        viewMenu.addItem(withTitle: "Open in Browser", action: #selector(openInBrowser(_:)), keyEquivalent: "o").keyEquivalentModifierMask = [.command, .shift]
+        let openBrowser = viewMenu.addItem(withTitle: "Open in Browser", action: #selector(openInBrowser(_:)), keyEquivalent: "o")
+        openBrowser.keyEquivalentModifierMask = [.command, .shift]
         viewMenu.addItem(NSMenuItem.separator())
         viewMenu.addItem(withTitle: "Show Logs", action: #selector(showLogs(_:)), keyEquivalent: "l")
-        viewMenu.addItem(withTitle: "Restart Gateway", action: #selector(restartGateway(_:)), keyEquivalent: "r").keyEquivalentModifierMask = [.command, .shift]
+        let restart = viewMenu.addItem(withTitle: "Restart Gateway", action: #selector(restartGateway(_:)), keyEquivalent: "r")
+        restart.keyEquivalentModifierMask = [.command, .shift]
 
         let windowMenuItem = NSMenuItem()
         main.addItem(windowMenuItem)
@@ -89,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let helpMenu = NSMenu(title: "Help")
         helpMenuItem.submenu = helpMenu
         helpMenu.addItem(withTitle: "Wally Help", action: #selector(openHelp(_:)), keyEquivalent: "")
+        helpMenu.addItem(withTitle: "Show Launch Log", action: #selector(openLaunchLog(_:)), keyEquivalent: "")
         NSApp.helpMenu = helpMenu
 
         return main
@@ -114,5 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let url = URL(string: "https://github.com/yedamao/wally") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @objc private func openLaunchLog(_ sender: Any?) {
+        NSWorkspace.shared.open(LaunchLog.url)
     }
 }

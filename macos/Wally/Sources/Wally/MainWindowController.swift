@@ -15,36 +15,30 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private var loadedURL: URL?
     private var didConfigureToolbar = false
 
-    /// Matches WebUI --bg-1 so the transparent title bar blends with the sidebar.
-    private let chromeColor = NSColor(calibratedRed: 12 / 255, green: 12 / 255, blue: 14 / 255, alpha: 1)
-
     init(gateway: GatewayController) {
         self.gateway = gateway
+        // Plain titled window — reliable visibility. Transparent /
+        // fullSizeContentView chrome caused invisible launches for some users.
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 840),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Wally"
         window.minSize = NSSize(width: 960, height: 640)
-        window.center()
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
         window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
-        window.backgroundColor = chromeColor
-        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
+        window.backgroundColor = .windowBackgroundColor
         super.init(window: window)
         window.delegate = self
-        // Do not replace window.contentView — that breaks fullSizeContentView
-        // layout and can yield an invisible window. Add into the stock one.
         installContent(in: window)
         gateway.delegate = self
         installObservers()
         render(gateway)
+        LaunchLog.write("MainWindowController init ok")
     }
 
     @available(*, unavailable)
@@ -59,10 +53,20 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     }
 
     func present() {
-        guard let window else { return }
-        window.center()
+        guard let window else {
+            LaunchLog.write("present: no window")
+            return
+        }
+        if window.screen == nil {
+            window.setFrameOrigin(NSPoint(x: 120, y: 120))
+        } else {
+            window.center()
+        }
+        window.setIsVisible(true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
+        LaunchLog.write("present: visible=\(window.isVisible) key=\(window.isKeyWindow) frame=\(window.frame)")
     }
 
     func gatewayControllerDidUpdate(_ controller: GatewayController) {
@@ -73,7 +77,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         guard let content = window.contentView else { return }
 
         root.wantsLayer = true
-        root.layer?.backgroundColor = chromeColor.cgColor
+        root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         root.translatesAutoresizingMaskIntoConstraints = false
         webContainer.translatesAutoresizingMaskIntoConstraints = false
         overlay.translatesAutoresizingMaskIntoConstraints = false
@@ -81,13 +85,6 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         content.addSubview(root)
         root.addSubview(webContainer)
         root.addSubview(overlay)
-
-        let topAnchor: NSLayoutYAxisAnchor
-        if let guide = window.contentLayoutGuide as? NSLayoutGuide {
-            topAnchor = guide.topAnchor
-        } else {
-            topAnchor = content.safeAreaLayoutGuide.topAnchor
-        }
 
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: content.leadingAnchor),
@@ -97,12 +94,12 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
 
             webContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             webContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            webContainer.topAnchor.constraint(equalTo: topAnchor),
+            webContainer.topAnchor.constraint(equalTo: root.topAnchor),
             webContainer.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
             overlay.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             overlay.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            overlay.topAnchor.constraint(equalTo: topAnchor),
+            overlay.topAnchor.constraint(equalTo: root.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
     }
@@ -134,6 +131,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
                 if loadedURL != url {
                     loadedURL = url
                     webView?.load(URLRequest(url: url))
+                    LaunchLog.write("loading \(url.absoluteString)")
                 }
             }
         case .idle, .locatingBinary, .starting:
@@ -144,6 +142,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
             overlay.showFailure(message: message, log: controller.logTail) { [weak self] in
                 self?.gateway.restart()
             }
+            LaunchLog.write("gateway failed: \(message.prefix(200))")
         }
         if !didConfigureToolbar {
             window?.toolbar = makeToolbar()
@@ -184,13 +183,21 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         alert.messageText = "Gateway"
         alert.informativeText =
             "Binary: \(gateway.binaryPath ?? "—")\nConfig: \(gateway.configPath())\n\n" +
-            (gateway.logTail.isEmpty ? "(no output yet)" : gateway.logTail)
+            (gateway.logTail.isEmpty ? "(no output yet)" : gateway.logTail) +
+            "\n\nLaunch log: \(LaunchLog.url.path)"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Open Launch Log")
         if let window {
-            alert.beginSheetModal(for: window)
+            alert.beginSheetModal(for: window) { response in
+                if response == .alertSecondButtonReturn {
+                    NSWorkspace.shared.open(LaunchLog.url)
+                }
+            }
         } else {
-            alert.runModal()
+            if alert.runModal() == .alertSecondButtonReturn {
+                NSWorkspace.shared.open(LaunchLog.url)
+            }
         }
     }
 }
