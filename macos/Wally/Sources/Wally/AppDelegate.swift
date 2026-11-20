@@ -13,14 +13,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let gateway = GatewayController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
         NSApp.mainMenu = buildMenu()
 
         let window = MainWindowController(gateway: gateway)
         mainWindow = window
         window.showWindow(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        window.present()
 
         gateway.start()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        mainWindow?.present()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

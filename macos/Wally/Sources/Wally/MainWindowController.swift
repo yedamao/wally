@@ -3,7 +3,7 @@ import WebKit
 
 final class MainWindowController: NSWindowController, GatewayControllerDelegate, NSWindowDelegate {
     private let gateway: GatewayController
-    private let split = NSView()
+    private let root = NSView()
     private let overlay = StatusOverlayView()
     private let webContainer = NSView()
     private var webView: WKWebView?
@@ -29,9 +29,6 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         window.title = "Wally"
         window.minSize = NSSize(width: 960, height: 640)
         window.center()
-        // Transparent title bar (no separator band). The WebView is pinned
-        // to contentLayoutGuide so it clears the traffic lights — CSS
-        // injection cannot pad the page because the WebUI CSP blocks it.
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
@@ -42,7 +39,9 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
-        window.contentView = buildContent(in: window)
+        // Do not replace window.contentView — that breaks fullSizeContentView
+        // layout and can yield an invisible window. Add into the stock one.
+        installContent(in: window)
         gateway.delegate = self
         installObservers()
         render(gateway)
@@ -59,38 +58,53 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         }
     }
 
+    func present() {
+        guard let window else { return }
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func gatewayControllerDidUpdate(_ controller: GatewayController) {
         render(controller)
     }
 
-    private func buildContent(in window: NSWindow) -> NSView {
-        split.wantsLayer = true
-        split.layer?.backgroundColor = chromeColor.cgColor
+    private func installContent(in window: NSWindow) {
+        guard let content = window.contentView else { return }
+
+        root.wantsLayer = true
+        root.layer?.backgroundColor = chromeColor.cgColor
+        root.translatesAutoresizingMaskIntoConstraints = false
         webContainer.translatesAutoresizingMaskIntoConstraints = false
         overlay.translatesAutoresizingMaskIntoConstraints = false
-        split.addSubview(webContainer)
-        split.addSubview(overlay)
 
-        // Pin below the title bar / traffic lights. The strip above stays
-        // chromeColor and remains system-draggable.
-        // contentLayoutGuide is typed as Any? on NSWindow; cast to NSLayoutGuide.
+        content.addSubview(root)
+        root.addSubview(webContainer)
+        root.addSubview(overlay)
+
         let topAnchor: NSLayoutYAxisAnchor
         if let guide = window.contentLayoutGuide as? NSLayoutGuide {
             topAnchor = guide.topAnchor
         } else {
-            topAnchor = split.safeAreaLayoutGuide.topAnchor
+            topAnchor = content.safeAreaLayoutGuide.topAnchor
         }
+
         NSLayoutConstraint.activate([
-            webContainer.leadingAnchor.constraint(equalTo: split.leadingAnchor),
-            webContainer.trailingAnchor.constraint(equalTo: split.trailingAnchor),
+            root.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            root.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            root.topAnchor.constraint(equalTo: content.topAnchor),
+            root.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+
+            webContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            webContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             webContainer.topAnchor.constraint(equalTo: topAnchor),
-            webContainer.bottomAnchor.constraint(equalTo: split.bottomAnchor),
-            overlay.leadingAnchor.constraint(equalTo: split.leadingAnchor),
-            overlay.trailingAnchor.constraint(equalTo: split.trailingAnchor),
+            webContainer.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+
+            overlay.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             overlay.topAnchor.constraint(equalTo: topAnchor),
-            overlay.bottomAnchor.constraint(equalTo: split.bottomAnchor),
+            overlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
-        return split
     }
 
     private func installObservers() {
@@ -144,7 +158,6 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         view.navigationDelegate = self
         view.uiDelegate = self
         view.allowsBackForwardNavigationGestures = true
-        view.setValue(false, forKey: "drawsBackground")
         view.translatesAutoresizingMaskIntoConstraints = false
         webContainer.addSubview(view)
         NSLayoutConstraint.activate([
