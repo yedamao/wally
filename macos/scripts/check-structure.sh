@@ -18,16 +18,21 @@ need "$MACOS/README.md"
 need "$MACOS/scripts/build-app.sh"
 need "$MACOS/Wally/Package.swift"
 need "$MACOS/Wally/Wally.entitlements"
-need "$MACOS/Wally/Sources/Wally/WallyApp.swift"
+need "$MACOS/Wally/Sources/Wally/main.swift"
+need "$MACOS/Wally/Sources/Wally/AppDelegate.swift"
 need "$MACOS/Wally/Sources/Wally/GatewayController.swift"
-need "$MACOS/Wally/Sources/Wally/ContentView.swift"
-need "$MACOS/Wally/Sources/Wally/WebView.swift"
-need "$MACOS/Wally/Sources/Wally/SettingsView.swift"
+need "$MACOS/Wally/Sources/Wally/MainWindowController.swift"
+need "$MACOS/Wally/Sources/Wally/StatusOverlayView.swift"
 need "$MACOS/Wally/Sources/Wally/Info.plist"
 need "$MACOS/Wally/Sources/Wally/Resources/AppIcon.svg"
 need "$MACOS/Wally/Tests/WallyTests/GatewayConfigTests.swift"
 
-# Info.plist essentials
+# Must be AppKit (Command Line Tools lack SwiftUIMacros).
+if grep -R -n --include='*.swift' -E 'import SwiftUI|@State |@StateObject|@EnvironmentObject' "$MACOS/Wally/Sources" >/dev/null; then
+  echo "SwiftUI macros found under Sources; the app must stay AppKit-only for CLT builds" >&2
+  fail=1
+fi
+
 for key in CFBundleIdentifier CFBundleExecutable LSMinimumSystemVersion NSAppTransportSecurity; do
   if ! grep -q "$key" "$MACOS/Wally/Sources/Wally/Info.plist"; then
     echo "Info.plist missing key: $key" >&2

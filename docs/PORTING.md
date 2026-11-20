@@ -816,10 +816,12 @@ Phase 2 is complete; phase 3 is in progress.
     no light theme, no per-chat model picker (the composer links the
     default model to the Models page), no unread markers or message
     timestamps (the protocol has neither).
-  - Done (macOS shell): `macos/Wally` is a SwiftUI + WKWebView app that
+  - Done (macOS shell): `macos/Wally` is an AppKit + WKWebView app that
     launches `wally webui --yes --no-open`, waits for `/healthz` and
     `/ui/`, and shows the embedded WebUI in a native window (bundle id
-    `ai.wally.app`). Package with `macos/scripts/build-app.sh` on a Mac;
+    `ai.wally.app`). AppKit (not SwiftUI) so Command Line Tools builds
+    work without `SwiftUIMacros`. Package with
+    `macos/scripts/build-app.sh` on a Mac;
     `macos/scripts/check-structure.sh` validates the tree on any OS.
     Not a port of a Python desktop app — Wally-only. Gaps: no menu-bar
     mode, no Sparkle updates, no notarized release pipeline yet.

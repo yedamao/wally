@@ -1,9 +1,13 @@
 import Foundation
 import os
 
+protocol GatewayControllerDelegate: AnyObject {
+    func gatewayControllerDidUpdate(_ controller: GatewayController)
+}
+
 /// Manages the local `wally webui` process and discovers the WebUI URL.
-@MainActor
-final class GatewayController: ObservableObject {
+/// All delegate callbacks are delivered on the main queue.
+final class GatewayController {
     enum Phase: Equatable {
         case idle
         case locatingBinary
@@ -12,18 +16,21 @@ final class GatewayController: ObservableObject {
         case failed(String)
     }
 
-    @Published private(set) var phase: Phase = .idle
-    @Published private(set) var pageURL: URL?
-    @Published private(set) var binaryPath: String?
-    @Published private(set) var logTail: String = ""
-    @Published var preferBundledBinary = true
+    weak var delegate: GatewayControllerDelegate?
+
+    private(set) var phase: Phase = .idle
+    private(set) var pageURL: URL?
+    private(set) var binaryPath: String?
+    private(set) var logTail: String = ""
+    var preferBundledBinary = true
 
     private var process: Process?
     private var stdoutPipe: Pipe?
     private var stderrPipe: Pipe?
-    private var readinessTask: Task<Void, Never>?
+    private var readinessWorkItem: DispatchWorkItem?
     private let log = Logger(subsystem: "ai.wally.app", category: "gateway")
     private var terminateObserver: NSObjectProtocol?
+    private let stateQueue = DispatchQueue(label: "ai.wally.app.gateway")
 
     private let defaultHost = "127.0.0.1"
     private let defaultPort = 18790
@@ -35,9 +42,7 @@ final class GatewayController: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                self?.stop()
-            }
+            self?.stop()
         }
     }
 
@@ -45,64 +50,29 @@ final class GatewayController: ObservableObject {
         if let terminateObserver {
             NotificationCenter.default.removeObserver(terminateObserver)
         }
-        stopSync()
+        // Terminate without touching MainActor / delegate.
+        killProcess()
     }
 
-    func start() async {
-        guard phase != .starting, phase != .ready else { return }
-        phase = .locatingBinary
-        pageURL = nil
-        logTail = ""
-
-        guard let binary = resolveBinary() else {
-            phase = .failed(
-                "Could not find the wally binary.\n\n" +
-                    "Build it with `go build -o bin/wally ./cmd/wally`, then either:\n" +
-                    "• put it on your PATH, or\n" +
-                    "• package the app with scripts/build-app.sh so it is bundled under Contents/Resources/wally."
-            )
-            return
-        }
-        binaryPath = binary
-        phase = .starting
-
-        do {
-            try launchWebUI(binary: binary)
-        } catch {
-            phase = .failed("Failed to start wally: \(error.localizedDescription)")
-            return
-        }
-
-        let url = await waitUntilReady()
-        if let url {
-            pageURL = url
-            phase = .ready
-        } else if phase == .starting {
-            phase = .failed(
-                "The WebUI did not become ready in time.\n\n" +
-                    "Check that nothing else is using port \(resolvedPort()), " +
-                    "and that ~/.nanobot-go/config.json is valid.\n\n" +
-                    (logTail.isEmpty ? "No process output was captured." : logTail)
-            )
-            stop()
+    func start() {
+        stateQueue.async { [weak self] in
+            self?.startLocked()
         }
     }
 
-    func restart() async {
-        stop()
-        // Brief pause so the previous lease can release the port.
-        try? await Task.sleep(nanoseconds: 400_000_000)
-        await start()
+    func restart() {
+        stateQueue.async { [weak self] in
+            guard let self else { return }
+            self.stopLocked()
+            Thread.sleep(forTimeInterval: 0.4)
+            self.startLocked()
+        }
     }
 
     func stop() {
-        readinessTask?.cancel()
-        readinessTask = nil
-        stopSync()
-        if phase == .ready || phase == .starting {
-            phase = .idle
+        stateQueue.async { [weak self] in
+            self?.stopLocked()
         }
-        pageURL = nil
     }
 
     // MARK: - Binary resolution
@@ -114,7 +84,6 @@ final class GatewayController: ObservableObject {
             if let bundled = Bundle.main.path(forResource: "wally", ofType: nil) {
                 candidates.append(bundled)
             }
-            // SPM resource layout / ad-hoc .app packaging
             if let res = Bundle.main.resourceURL {
                 candidates.append(res.appendingPathComponent("wally").path)
                 candidates.append(res.appendingPathComponent("bin/wally").path)
@@ -125,7 +94,6 @@ final class GatewayController: ObservableObject {
             candidates.insert(env, at: 0)
         }
 
-        // Common local build locations relative to the app / cwd
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         candidates.append(contentsOf: [
             "\(home)/go/bin/wally",
@@ -152,6 +120,58 @@ final class GatewayController: ObservableObject {
         return which("wally") ?? which("nanobot")
     }
 
+    func configPath() -> String {
+        if let env = ProcessInfo.processInfo.environment["NANOBOT_GO_CONFIG"], !env.isEmpty {
+            return (env as NSString).expandingTildeInPath
+        }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return "\(home)/.nanobot-go/config.json"
+    }
+
+    // MARK: - Private
+
+    private func startLocked() {
+        guard phase != .starting, phase != .ready else { return }
+        setPhase(.locatingBinary, url: nil, clearLog: true)
+
+        guard let binary = resolveBinary() else {
+            setPhase(
+                .failed(
+                    "Could not find the wally binary.\n\n" +
+                        "Build it with `go build -o bin/wally ./cmd/wally`, then either:\n" +
+                        "• put it on your PATH, or\n" +
+                        "• package the app with scripts/build-app.sh so it is bundled under Contents/Resources/wally."
+                ),
+                url: nil
+            )
+            return
+        }
+        binaryPath = binary
+        notify()
+        setPhase(.starting, url: nil)
+
+        do {
+            try launchWebUI(binary: binary)
+        } catch {
+            setPhase(.failed("Failed to start wally: \(error.localizedDescription)"), url: nil)
+            return
+        }
+
+        waitUntilReady()
+    }
+
+    private func stopLocked() {
+        readinessWorkItem?.cancel()
+        readinessWorkItem = nil
+        killProcess()
+        if phase == .ready || phase == .starting {
+            setPhase(.idle, url: nil)
+        } else {
+            pageURL = nil
+            notify()
+        }
+    }
+
     private func which(_ name: String) -> String? {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/which")
@@ -173,10 +193,8 @@ final class GatewayController: ObservableObject {
         return path
     }
 
-    // MARK: - Process
-
     private func launchWebUI(binary: String) throws {
-        stopSync()
+        killProcess()
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: binary)
@@ -184,7 +202,6 @@ final class GatewayController: ObservableObject {
         proc.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
         var env = ProcessInfo.processInfo.environment
-        // Prefer the real binary name in child logs / service installs.
         env["NANOBOT_GO_CLI_NAME"] = "wally"
         proc.environment = env
 
@@ -198,27 +215,25 @@ final class GatewayController: ObservableObject {
         out.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-            Task { @MainActor in
-                self?.appendLog(text)
-            }
+            self?.stateQueue.async { self?.appendLog(text) }
         }
         err.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-            Task { @MainActor in
-                self?.appendLog(text)
-            }
+            self?.stateQueue.async { self?.appendLog(text) }
         }
 
         proc.terminationHandler = { [weak self] process in
-            Task { @MainActor in
+            self?.stateQueue.async {
                 guard let self else { return }
                 if self.process == process {
                     self.process = nil
                     if self.phase == .ready || self.phase == .starting {
                         let code = process.terminationStatus
-                        self.phase = .failed("wally webui exited (status \(code)).\n\n\(self.logTail)")
-                        self.pageURL = nil
+                        self.setPhase(
+                            .failed("wally webui exited (status \(code)).\n\n\(self.logTail)"),
+                            url: nil
+                        )
                     }
                 }
             }
@@ -229,14 +244,13 @@ final class GatewayController: ObservableObject {
         log.info("started \(binary, privacy: .public) webui pid=\(proc.processIdentifier)")
     }
 
-    private func stopSync() {
+    private func killProcess() {
         guard let proc = process else { return }
         process = nil
         stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         stderrPipe?.fileHandleForReading.readabilityHandler = nil
         if proc.isRunning {
             proc.terminate()
-            // Give it a moment for the lease release; escalate if needed.
             let deadline = Date().addingTimeInterval(3)
             while proc.isRunning, Date() < deadline {
                 Thread.sleep(forTimeInterval: 0.05)
@@ -249,41 +263,77 @@ final class GatewayController: ObservableObject {
 
     private func appendLog(_ text: String) {
         logTail = String((logTail + text).suffix(4000))
+        notify()
     }
 
-    // MARK: - Readiness
-
-    private func waitUntilReady() async -> URL? {
+    private func waitUntilReady() {
         let port = resolvedPort()
         let host = resolvedHost()
         let base = URL(string: "http://\(host):\(port)")!
         let page = base.appendingPathComponent("ui/")
         let health = base.appendingPathComponent("healthz")
-
         let deadline = Date().addingTimeInterval(readyTimeout)
-        while Date() < deadline {
-            if Task.isCancelled { return nil }
-            if process?.isRunning != true {
-                return nil
-            }
-            if await ping(health), await ping(page) {
-                return page
-            }
-            try? await Task.sleep(nanoseconds: 250_000_000)
+
+        let work = DispatchWorkItem { [weak self] in
+            self?.pollReady(page: page, health: health, deadline: deadline)
         }
-        return nil
+        readinessWorkItem = work
+        stateQueue.async(execute: work)
     }
 
-    private func ping(_ url: URL) async -> Bool {
+    private func pollReady(page: URL, health: URL, deadline: Date) {
+        if readinessWorkItem?.isCancelled == true { return }
+        if process?.isRunning != true {
+            if phase == .starting {
+                setPhase(
+                    .failed(
+                        "The WebUI process exited before becoming ready.\n\n" +
+                            (logTail.isEmpty ? "No process output was captured." : logTail)
+                    ),
+                    url: nil
+                )
+            }
+            return
+        }
+        if ping(health), ping(page) {
+            setPhase(.ready, url: page)
+            return
+        }
+        if Date() >= deadline {
+            let port = resolvedPort()
+            setPhase(
+                .failed(
+                    "The WebUI did not become ready in time.\n\n" +
+                        "Check that nothing else is using port \(port), " +
+                        "and that ~/.nanobot-go/config.json is valid.\n\n" +
+                        (logTail.isEmpty ? "No process output was captured." : logTail)
+                ),
+                url: nil
+            )
+            killProcess()
+            return
+        }
+        let work = DispatchWorkItem { [weak self] in
+            self?.pollReady(page: page, health: health, deadline: deadline)
+        }
+        readinessWorkItem = work
+        stateQueue.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
+    private func ping(_ url: URL) -> Bool {
         var req = URLRequest(url: url, timeoutInterval: 1.5)
         req.httpMethod = "GET"
-        do {
-            let (_, resp) = try await URLSession.shared.data(for: req)
-            guard let http = resp as? HTTPURLResponse else { return false }
-            return (200..<400).contains(http.statusCode)
-        } catch {
-            return false
+        let sem = DispatchSemaphore(value: 0)
+        var ok = false
+        let task = URLSession.shared.dataTask(with: req) { _, resp, _ in
+            if let http = resp as? HTTPURLResponse {
+                ok = (200..<400).contains(http.statusCode)
+            }
+            sem.signal()
         }
+        task.resume()
+        _ = sem.wait(timeout: .now() + 2)
+        return ok
     }
 
     private func resolvedPort() -> Int {
@@ -296,8 +346,6 @@ final class GatewayController: ObservableObject {
     private func resolvedHost() -> String {
         let host = readGatewayConfig()?.host?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let host, !host.isEmpty {
-            // WKWebView should use a loopback literal when the gateway
-            // binds 0.0.0.0 / :: .
             if host == "0.0.0.0" || host == "::" || host == "[::]" {
                 return defaultHost
             }
@@ -323,11 +371,17 @@ final class GatewayController: ObservableObject {
         return try? JSONDecoder().decode(ConfigJSON.self, from: data).gateway
     }
 
-    func configPath() -> String {
-        if let env = ProcessInfo.processInfo.environment["NANOBOT_GO_CONFIG"], !env.isEmpty {
-            return (env as NSString).expandingTildeInPath
+    private func setPhase(_ phase: Phase, url: URL?, clearLog: Bool = false) {
+        self.phase = phase
+        self.pageURL = url
+        if clearLog { logTail = "" }
+        notify()
+    }
+
+    private func notify() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.delegate?.gatewayControllerDidUpdate(self)
         }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/.nanobot-go/config.json"
     }
 }

@@ -4,10 +4,14 @@ A native Mac app that runs the local Wally gateway and shows the embedded
 WebUI in a `WKWebView` window — same workbench as `wally webui`, without
 opening a browser.
 
+The UI shell is **AppKit** (not SwiftUI), so it builds with either full
+Xcode or the Command Line Tools. SwiftUI’s `@State` macros need the
+`SwiftUIMacros` plugin, which Command Line Tools do not ship.
+
 ## Requirements
 
 - macOS 14 or later
-- Xcode 15+ / Swift 5.9+ (Command Line Tools are enough to build)
+- Swift 5.9+ (Xcode or Command Line Tools)
 - Go 1.26+ when the build script embeds a fresh `wally` binary
 
 ## Build
@@ -46,8 +50,8 @@ The app looks for a `wally` (or `nanobot`) binary in this order:
    (an on-demand gateway stops when no clients remain; a
    `gateway service install` / `gateway --background` gateway stays up).
 
-Menus: **Reload WebUI** (⌘R), **Open in Browser** (⇧⌘O), **Restart
-Gateway** (⇧⌘R). Settings (⌘,) show the binary path and config file.
+Menus: **Reload WebUI** (⌘R), **Open in Browser** (⇧⌘O), **Show Logs**
+(⌘L), **Restart Gateway** (⇧⌘R).
 
 ## Develop the Swift sources
 

@@ -76,9 +76,9 @@ standard library are a pure-Go SQLite driver and the official MCP Go SDK.
   shared on-demand gateway (lease), and opens the browser;
   `gateway --background` makes that gateway persistent, and
   `gateway service install` a LaunchAgent or systemd user service.
-- macOS app (phase 4): `macos/` is a SwiftUI shell that starts
-  `wally webui --yes --no-open` and shows the same WebUI in a
-  `WKWebView` window. Build on a Mac with `./macos/scripts/build-app.sh`
+- macOS app (phase 4): `macos/` is an AppKit + `WKWebView` shell that
+  starts `wally webui --yes --no-open` and shows the same WebUI in a
+  native window. Build on a Mac with `./macos/scripts/build-app.sh`
   (see [macos/README.md](macos/README.md)).
 
 Not yet: other chat channels (Slack, Discord, WeCom, ...), local
@@ -1029,8 +1029,8 @@ browser. From a macOS machine with Xcode / Swift installed:
 open macos/dist/Wally.app
 ```
 
-The app runs `wally webui --yes --no-open`, embeds (or finds) the CLI,
-and loads `/ui/` in `WKWebView`. Details: [macos/README.md](macos/README.md).
+The AppKit app runs `wally webui --yes --no-open`, embeds (or finds) the
+CLI, and loads `/ui/` in `WKWebView`. Details: [macos/README.md](macos/README.md).
 
 `nanobot webui` enables `channels.websocket` in the config (asking
 first; `--yes`/`-y` skips the question, and without a terminal it is

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build Wally.app on macOS: compile the SwiftUI shell and embed a darwin
-# wally binary. Run from anywhere; requires macOS 14+, Xcode CLT / Swift 5.9+,
-# and Go 1.26+ when --build-cli is set (default).
+# Build Wally.app on macOS: compile the AppKit + WKWebView shell and embed
+# a darwin wally binary. Run from anywhere; requires macOS 14+, Swift 5.9+
+# (Xcode or Command Line Tools), and Go 1.26+ when embedding a fresh CLI.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -44,8 +44,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "build-app.sh must run on macOS (SwiftUI / AppKit)." >&2
+  echo "build-app.sh must run on macOS (AppKit / WebKit)." >&2
   exit 1
+fi
+
+# Prefer full Xcode when present (better SDKs); CLT alone is enough for AppKit.
+if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app/Contents/Developer ]]; then
+  export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 fi
 
 if ! command -v swift >/dev/null; then
@@ -56,9 +61,12 @@ fi
 mkdir -p "$OUT_DIR"
 rm -rf "$APP"
 
-echo "==> Building Swift package ($CONFIG)"
+echo "==> Building Swift package ($CONFIG) with $(swift --version 2>&1 | head -1)"
+echo "    DEVELOPER_DIR=${DEVELOPER_DIR:-"(default)"}"
 (
   cd "$APP_SRC"
+  # Clear a stale build dir that may have been produced under a different toolchain.
+  rm -rf .build
   swift build -c "$CONFIG" --product Wally
 )
 
