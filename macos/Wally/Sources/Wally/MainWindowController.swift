@@ -6,7 +6,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private let split = NSView()
     private let overlay = StatusOverlayView()
     private let webContainer = NSView()
-    private var webView: WKWebView?
+    private var webView: DraggableWebView?
     private var toolbar: NSToolbar?
     private var reloadObserver: NSObjectProtocol?
     private var openObserver: NSObjectProtocol?
@@ -15,24 +15,30 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private var loadedURL: URL?
     private var didConfigureToolbar = false
 
+    /// Matches WebUI --bg-1 so the transparent title bar does not flash a seam.
+    private let chromeColor = NSColor(calibratedRed: 12 / 255, green: 12 / 255, blue: 14 / 255, alpha: 1)
+
     init(gateway: GatewayController) {
         self.gateway = gateway
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 840),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Wally"
         window.minSize = NSSize(width: 960, height: 640)
         window.center()
-        // Keep a real title bar so the window can be click-dragged. A
-        // fullSizeContentView + WKWebView under a transparent title bar
-        // steals mouse events and blocks dragging.
-        window.titlebarAppearsTransparent = false
+        // Seamless chrome: WebUI draws under a transparent title bar so
+        // there is no opaque native strip / separator above the page.
+        // DraggableWebView restores click-drag on the top content area.
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
         window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
+        window.backgroundColor = chromeColor
+        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
@@ -59,6 +65,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
 
     private func buildContent() -> NSView {
         split.wantsLayer = true
+        split.layer?.backgroundColor = chromeColor.cgColor
         webContainer.translatesAutoresizingMaskIntoConstraints = false
         overlay.translatesAutoresizingMaskIntoConstraints = false
         split.addSubview(webContainer)
@@ -123,10 +130,12 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private func ensureWebView() {
         if webView != nil { return }
         let config = WKWebViewConfiguration()
-        let view = WKWebView(frame: .zero, configuration: config)
+        config.userContentController.addUserScript(Self.chromeInsetScript)
+        let view = DraggableWebView(frame: .zero, configuration: config)
         view.navigationDelegate = self
         view.uiDelegate = self
         view.allowsBackForwardNavigationGestures = true
+        view.setValue(false, forKey: "drawsBackground")
         view.translatesAutoresizingMaskIntoConstraints = false
         webContainer.addSubview(view)
         NSLayoutConstraint.activate([
@@ -137,6 +146,31 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         ])
         webView = view
     }
+
+    /// Pads the WebUI brand/topbar under the traffic lights so content is
+    /// not obscured and the top strip can be used to drag the window.
+    private static let chromeInsetScript: WKUserScript = {
+        let source = """
+        (function () {
+          if (document.documentElement.dataset.wallyMacChrome === "1") return;
+          document.documentElement.dataset.wallyMacChrome = "1";
+          var css = document.createElement("style");
+          css.textContent = `
+            :root { --wally-mac-titlebar: 28px; }
+            .brand { padding-top: calc(14px + var(--wally-mac-titlebar)) !important; }
+            .topbar {
+              height: calc(56px + var(--wally-mac-titlebar)) !important;
+              padding-top: var(--wally-mac-titlebar) !important;
+              box-sizing: border-box !important;
+            }
+            .settings-nav .brand { padding-top: calc(14px + var(--wally-mac-titlebar)) !important; }
+            .login-card { margin-top: var(--wally-mac-titlebar); }
+          `;
+          (document.head || document.documentElement).appendChild(css);
+        })();
+        """
+        return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+    }()
 
     private func makeToolbar() -> NSToolbar {
         if let toolbar { return toolbar }
