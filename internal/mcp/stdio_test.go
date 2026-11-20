@@ -66,7 +66,7 @@ func TestStdioServer(t *testing.T) {
 	}
 	dir := t.TempDir()
 	t.Setenv("MCP_TEST_GREETING", "hello")
-	t.Setenv("NANOBOT_GO_ANTHROPIC_API_KEY", "sk-must-not-leak")
+	t.Setenv("WALLY_ANTHROPIC_API_KEY", "sk-must-not-leak")
 	cfgs := map[string]config.MCPServerConfig{
 		"local": {
 			Command: exe,
@@ -116,7 +116,7 @@ func TestStdioServer(t *testing.T) {
 	if got := exec("mcp_local_getenv", `{"name": "GREETING"}`); got != "hello|"+dir && !sameDir(got, "hello|", dir) {
 		t.Errorf("GREETING|cwd = %q, want hello|%s", got, dir)
 	}
-	if got := exec("mcp_local_getenv", `{"name": "NANOBOT_GO_ANTHROPIC_API_KEY"}`); strings.HasPrefix(got, "sk-") {
+	if got := exec("mcp_local_getenv", `{"name": "WALLY_ANTHROPIC_API_KEY"}`); strings.HasPrefix(got, "sk-") {
 		t.Error("an API key leaked into the MCP server's environment")
 	}
 

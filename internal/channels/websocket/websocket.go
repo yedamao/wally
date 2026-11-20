@@ -13,7 +13,7 @@
 //
 // It borrows only the idea of nanobot's WebSocket channel
 // (nanobot/channels/websocket): a bus bridge keyed by chat id. The wire
-// protocol is nanobot-go's own and much smaller; see README.md.
+// protocol is Wally's own and much smaller; see README.md.
 //
 // Requests from this device (a loopback Host header and a loopback peer)
 // need no sign-in. Others must sign in with channels.websocket's token or

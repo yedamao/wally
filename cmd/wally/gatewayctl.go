@@ -218,7 +218,7 @@ func (a *app) gatewayBackground(ctx context.Context, flags *commonFlags, host st
 	if st, err := rt.Status(); err != nil {
 		return err
 	} else if !st.Running && gatewayHealthy(ctx, client, base) {
-		return fmt.Errorf("a gateway this command does not manage already answers on %s (started by an older nanobot-go, or for another config); stop it from the terminal where it runs first", base)
+		return fmt.Errorf("a gateway this command does not manage already answers on %s (started by an older Wally, or for another config); stop it from the terminal where it runs first", base)
 	}
 	res, err := rt.StartBackground(opts)
 	if err != nil {

@@ -76,7 +76,7 @@ func TestWebSettingsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := runningSettings(t, path, map[string]string{"NANOBOT_GO_OPENAI_API_KEY": envSecret, "NANOBOT_GO_API_KEY": envSecret})
+	s := runningSettings(t, path, map[string]string{"WALLY_OPENAI_API_KEY": envSecret, "WALLY_API_KEY": envSecret})
 
 	v, err := s.Settings()
 	if err != nil {
@@ -238,7 +238,7 @@ func imagePatch(p websocket.ImageGenerationPatch) websocket.SettingsPatch {
 
 func TestWebSettingsImageGeneration(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningSettings(t, path, map[string]string{"NANOBOT_GO_OPENAI_API_KEY": envSecret})
+	s := runningSettings(t, path, map[string]string{"WALLY_OPENAI_API_KEY": envSecret})
 
 	v, err := s.UpdateSettings(imagePatch(websocket.ImageGenerationPatch{
 		Enabled: ptr(true), Provider: ptr(" openai "), Model: ptr(" gpt-image-1 "),
@@ -378,7 +378,7 @@ func TestWebSearchKeySource(t *testing.T) {
 	}{
 		{func() {}, ""},
 		{func() { env["WEB_SEARCH_API_KEY"] = envSecret }, "environment"},
-		{func() { env["NANOBOT_GO_DEEPSEEK_API_KEY"] = envSecret }, "providers.deepseek.apiKey"},
+		{func() { env["WALLY_DEEPSEEK_API_KEY"] = envSecret }, "providers.deepseek.apiKey"},
 		{func() { cfg.Tools.Web.Search.APIKey = fileSecret }, "tools.web.search.apiKey"},
 	} {
 		step.set()
@@ -435,7 +435,7 @@ func TestWebSettingsSSRFWhitelistHotApply(t *testing.T) {
 
 func TestWebSettingsSandboxAndProvider(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningSettings(t, path, map[string]string{"NANOBOT_GO_MODEL": "env-model"})
+	s := runningSettings(t, path, map[string]string{"WALLY_MODEL": "env-model"})
 	choices := sandboxChoices()
 	for _, name := range choices {
 		v, err := s.UpdateSettings(websocket.SettingsPatch{Tools: &websocket.ToolSettingsPatch{ExecSandbox: ptr(name)}})
@@ -455,7 +455,7 @@ func TestWebSettingsSandboxAndProvider(t *testing.T) {
 
 func TestWebSettingsFallbackModels(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningSettings(t, path, map[string]string{"NANOBOT_GO_OPENAI_API_KEY": envSecret})
+	s := runningSettings(t, path, map[string]string{"WALLY_OPENAI_API_KEY": envSecret})
 
 	v, err := s.UpdateSettings(websocket.SettingsPatch{FallbackModels: &[]websocket.FallbackModel{
 		{Provider: "openai", Model: " gpt-test "},
@@ -540,7 +540,7 @@ func TestWebSettingsMissingFile(t *testing.T) {
 
 func TestWebSettingsSaveDisabledSkills(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningSettings(t, path, map[string]string{"NANOBOT_GO_OPENAI_API_KEY": envSecret})
+	s := runningSettings(t, path, map[string]string{"WALLY_OPENAI_API_KEY": envSecret})
 	if err := s.saveDisabledSkills([]string{"cron", "deploy"}); err != nil {
 		t.Fatal(err)
 	}

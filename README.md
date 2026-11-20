@@ -1,4 +1,4 @@
-# Wally (nanobot-go)
+# Wally
 
 Wally is a Go rewrite of [nanobot](https://github.com/HKUDS/nanobot), a small,
 always-on personal AI agent. It talks to Anthropic or any OpenAI-compatible
@@ -94,8 +94,8 @@ Requires Go 1.26+.
 go build -o bin/wally ./cmd/wally
 ln -sfn wally bin/nanobot       # compatibility for existing scripts/services
 
-bin/nanobot onboard          # writes ~/.nanobot-go/config.json and the workspace
-$EDITOR ~/.nanobot-go/config.json   # add an API key (or use an env var, below)
+bin/nanobot onboard          # writes ~/.wally/config.json and the workspace
+$EDITOR ~/.wally/config.json   # add an API key (or use an env var, below)
 bin/nanobot status           # check what will be used (keys are never printed)
 
 bin/nanobot agent -m "What files are in my workspace?"   # one-shot
@@ -123,33 +123,35 @@ nanobot completion fish > ~/.config/fish/completions/nanobot.fish
 nanobot completion powershell | Out-File -Append $PROFILE
 ```
 
-The scripts complete `wally` and the compatibility names `nanobot` and
-`nanobot-go`.
+The scripts complete `wally` and the compatibility name `nanobot`.
 
 API keys can also come from the environment, which overrides the file:
 
 ```sh
-export NANOBOT_GO_ANTHROPIC_API_KEY=sk-ant-...
-# also NANOBOT_GO_{OPENAI,DEEPSEEK,OPENROUTER}_API_KEY, NANOBOT_GO_<P>_API_BASE,
-# NANOBOT_GO_MODEL, NANOBOT_GO_PROVIDER, NANOBOT_GO_WORKSPACE,
-# NANOBOT_GO_API_KEY (the bearer token of the OpenAI-compatible API),
-# NANOBOT_GO_TELEGRAM_TOKEN (the Telegram bot token),
-# NANOBOT_GO_WEIXIN_TOKEN (a WeChat bot token, instead of the QR login)
+export WALLY_ANTHROPIC_API_KEY=sk-ant-...
+# also WALLY_{OPENAI,DEEPSEEK,OPENROUTER}_API_KEY, WALLY_<P>_API_BASE,
+# WALLY_MODEL, WALLY_PROVIDER, WALLY_WORKSPACE,
+# WALLY_API_KEY (the bearer token of the OpenAI-compatible API),
+# WALLY_TELEGRAM_TOKEN (the Telegram bot token),
+# WALLY_WEIXIN_TOKEN (a WeChat bot token, instead of the QR login)
 ```
 
-nanobot-go deliberately does not read `ANTHROPIC_API_KEY` or
+Wally deliberately does not read `ANTHROPIC_API_KEY` or
 `OPENAI_API_KEY`, so it never picks up credentials meant for other tools.
+
+Legacy `NANOBOT_GO_*` environment variables and a pre-existing
+`~/.nanobot-go` data directory are still accepted for one release.
 
 ## Configuration
 
-`~/.nanobot-go/config.json` (override with `--config` or `NANOBOT_GO_CONFIG`).
+`~/.wally/config.json` (override with `--config` or `WALLY_CONFIG`).
 Missing fields keep their defaults; unknown keys are an error.
 
 ```json
 {
   "agents": {
     "defaults": {
-      "workspace": "~/.nanobot-go/workspace",
+      "workspace": "~/.wally/workspace",
       "model": "claude-opus-4-5",
       "provider": "auto",
       "maxTokens": 8192,
@@ -197,7 +199,7 @@ placeholder such as `***` or a hint is refused with 400),
 `{"clearApiKey":true}` and/or `{"apiBase":"https://…"}` (`""` removes
 it). Provider clients are built when the gateway starts, so a change
 shows **restart required** until it restarts; `env_overrides` names the
-fields `NANOBOT_GO_<NAME>_API_KEY` / `_API_BASE` override.
+fields `WALLY_<NAME>_API_KEY` / `_API_BASE` override.
 **Test** on a card calls `POST /ui/providers/{name}/test` (local or
 signed in, same-origin) with the typed key and the API base field if
 edited (`{"apiKey"?,"apiBase"?}`, never saved; `{}` tests the saved key,
@@ -220,10 +222,10 @@ memory); they are added to the system prompt, except `AGENTS.md`,
 `nanobot onboard` creates. `nanobot onboard` also writes `HEARTBEAT.md`,
 the heartbeat's task list (see [Heartbeat](#heartbeat)), which is not
 part of the system prompt. Sessions are stored in a SQLite database,
-`~/.nanobot-go/sessions/<workspace id>/sessions.sqlite3` (the ID is a hash
+`~/.wally/sessions/<workspace id>/sessions.sqlite3` (the ID is a hash
 of the workspace path; `nanobot status` prints the full path), next to the
 config file and outside the workspace. Session files from older versions
-(`~/.nanobot-go/sessions/*.jsonl`) are imported the first time the
+(`~/.wally/sessions/*.jsonl`) are imported the first time the
 database is opened and renamed to `*.jsonl.migrated`. If another process
 saved the same session in the meantime, the turn fails instead of
 overwriting it.
@@ -367,7 +369,7 @@ chat completions, and works whichever chat provider you use.
 ```
 
 The key is `tools.web.search.apiKey`, else `providers.deepseek.apiKey`
-(so `NANOBOT_GO_DEEPSEEK_API_KEY` and the Providers page work), else the
+(so `WALLY_DEEPSEEK_API_KEY` and the Providers page work), else the
 `DEEPSEEK_API_KEY` or `WEB_SEARCH_API_KEY` environment variable; the
 resolved key is never written to `config.json`. `maxResults` (1–50,
 default 5) is the count when the model gives none; the model may ask for
@@ -559,7 +561,7 @@ a token header:
 {"tools": {"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp", "auth": "oauth"}}}}
 ```
 
-Sign in from the WebUI's **MCP** page with **Sign in**: nanobot-go
+Sign in from the WebUI's **MCP** page with **Sign in**: Wally
 discovers the server's authorization server, registers itself
 (dynamic client registration, PKCE), and opens the sign-in page. The
 browser returns to the gateway at `/auth/mcp/callback`; when the WebUI
@@ -712,7 +714,7 @@ order.
 
 Each key of `channels` is a channel name with an object holding at least
 `"enabled"`; the channel itself checks the other keys. An enabled channel
-nanobot-go does not know is an error at startup. The channels so far are
+Wally does not know is an error at startup. The channels so far are
 [Telegram](#telegram), [WeChat](#wechat) and `websocket`, the
 [WebUI](#webui).
 
@@ -765,18 +767,18 @@ from, by absolute path.
   `--background`: the service manager supervises it. The port must be
   fixed (`gateway.port` or `--port`; 0 is refused). The working directory
   is the workspace, or your home.
-- **macOS.** `~/Library/LaunchAgents/ai.nanobot-go.gateway.plist` in the
+- **macOS.** `~/Library/LaunchAgents/ai.wally.gateway.plist` in the
   `gui/<uid>` domain, with `RunAtLoad` (from `--enable`, the default) and
   `KeepAlive {SuccessfulExit: false}`: launchd restarts the gateway when
   it crashes or exits with an error, not after a clean shutdown. Output
-  goes to `logs/nanobot-go-gateway.launchd.log` and `.launchd.err.log`
+  goes to `logs/wally-gateway.launchd.log` and `.launchd.err.log`
   next to the config file.
-- **Linux.** `~/.config/systemd/user/nanobot-go-gateway.service`
+- **Linux.** `~/.config/systemd/user/wally-gateway.service`
   (`Type=simple`, `Restart=always`, `RestartSec=10`), enabled with
   `systemctl --user enable` and started with `restart`. Run
   `loginctl enable-linger $USER` for it to start at boot without a login.
-- **Names.** `--name` (default `nanobot-go-gateway`) gives the label
-  `ai.nanobot-go.<name without nanobot-go->` and the unit
+- **Names.** `--name` (default `wally-gateway`) gives the label
+  `ai.wally.<name without wally->` and the unit
   `<name>.service`, apart from nanobot's (Python) `ai.nanobot.gateway`
   and `nanobot-gateway.service`, so both can be installed. Use another
   `--name` (and `--config`/`--port`) for a second gateway.
@@ -799,7 +801,7 @@ from, by absolute path.
 - **Environment.** The service does not read your shell profile: only
   `PATH` is copied in at install time (for MCP servers and tools). Keep
   API keys and tokens in the config file rather than in
-  `NANOBOT_GO_*` variables, or the service gateway will not find them.
+  `WALLY_*` variables, or the service gateway will not find them.
 
 ### Telegram
 
@@ -823,7 +825,7 @@ channel and run `nanobot gateway`:
 }
 ```
 
-Only `enabled` and the token are required. `NANOBOT_GO_TELEGRAM_TOKEN`
+Only `enabled` and the token are required. `WALLY_TELEGRAM_TOKEN`
 overrides `token`, so the token can stay out of the file. `apiBase`
 (default `https://api.telegram.org`) points at another Bot API server.
 `proxy` takes an `http://`, `https://` or `socks5://` URL (a bare
@@ -940,20 +942,20 @@ Multiple personal WeChat accounts can use named channel keys such as
 `state/weixin.work/account.json`. The bare `weixin` key continues to use
 `state/weixin/account.json`.
 
-The login prints the link of a QR code. nanobot-go does not draw QR codes
+The login prints the link of a QR code. Wally does not draw QR codes
 in the terminal; turn the link into one (for example
 `qrencode -t ansiutf8 '<link>'`) and scan it with WeChat, then confirm on
 the phone. If WeChat shows a number to type in, the command asks for it.
 An expired code is replaced up to three times. The bot token and the API
 host WeChat assigned to the account are saved to
 `state/weixin/account.json` next to the config file (mode `0600`, so
-`~/.nanobot-go/state/weixin/account.json` by default), never to
+`~/.wally/state/weixin/account.json` by default), never to
 `config.json`. Running the login again does nothing while a login is
 saved; `--force` logs in anew and keeps the saved login until the new one
 is confirmed.
 
 All settings are optional: `token` (a bot token to use instead of the
-saved login; `NANOBOT_GO_WEIXIN_TOKEN` overrides it), `allowFrom`,
+saved login; `WALLY_WEIXIN_TOKEN` overrides it), `allowFrom`,
 `baseUrl` (default `https://ilinkai.weixin.qq.com`), `routeTag` (sent as
 the `SKRouteTag` header), `stateDir` (where `account.json` lives) and
 `pollTimeout` (seconds, default 35; the server may suggest another). A
@@ -1011,7 +1013,7 @@ it:
 
 ```sh
 bin/nanobot webui
-# WebUI setup will update ~/.nanobot-go/config.json: enable channels.websocket.
+# WebUI setup will update ~/.wally/config.json: enable channels.websocket.
 # Set up WebUI? [y/N] y
 # Starting the gateway...
 #
@@ -1065,7 +1067,7 @@ confirmation.
   reloads once the new gateway answers. A foreground `nanobot gateway`
   gets 409: restart it in its terminal, or stop it and run
   `nanobot gateway --background`.
-- **Errors, not guesses.** If something other than a nanobot-go gateway
+- **Errors, not guesses.** If something other than a Wally gateway
   holds the port, or a gateway runs there without the WebUI, it says so
   and exits.
 - **`--host`** sets `gateway.host` and saves it. Beyond loopback (e.g.
@@ -1078,7 +1080,7 @@ confirmation.
 - **`--dev`** also runs the Vite dev server (`npm run dev` in `webui/`,
   with hot reload) on `http://127.0.0.1:5173/ui/`, proxying to the
   gateway; it needs Node, `npm install` in `webui/`, and the source
-  checkout (run it inside the repo, or set `NANOBOT_GO_WEBUI_DIR`).
+  checkout (run it inside the repo, or set `WALLY_WEBUI_DIR`).
 - **`--background`** on `webui` is deprecated: run
   `nanobot gateway --background`, then `nanobot webui`.
 - `--config`/`-c` and `--workspace`/`-w` work as for the other commands;
@@ -1097,7 +1099,7 @@ Or enable it by hand and start the gateway yourself:
 
 ```sh
 bin/nanobot gateway
-# nanobot-go gateway ...
+# Wally gateway ...
 # Health endpoint: http://127.0.0.1:18790/healthz
 # WebUI: http://127.0.0.1:18790/
 ```
@@ -1197,7 +1199,7 @@ and press Enter. Each reply is a full agent turn, tools included.
   the section if needed and changes only those keys (the proxy,
   `stateDir` and anything else are kept), checks the result as the
   gateway would (an enabled Telegram channel needs a well-formed token,
-  here or in `NANOBOT_GO_TELEGRAM_TOKEN`) and answers 400 with a
+  here or in `WALLY_TELEGRAM_TOKEN`) and answers 400 with a
   message that never holds the token. Channels are built at start, so a
   change shows **restart required**. **Test** (`POST
   /ui/channels/config/telegram/test`, `{"token"?}` never saved) asks
@@ -1293,7 +1295,7 @@ and press Enter. Each reply is a full agent turn, tools included.
   and answers the new view; `restart_required` lists the saved settings
   that differ from the running gateway's, `applied` the ones of this
   change the running gateway took on at once, `env_overrides` the ones
-  `NANOBOT_GO_MODEL`/`NANOBOT_GO_PROVIDER` override (the environment
+  `WALLY_MODEL`/`WALLY_PROVIDER` override (the environment
   still wins after a restart). Unknown keys, wrongly cased keys, nulls,
   bad values and any key that looks secret (`apiKey`, `token`,
   `allowFrom`, `headers`, `env`, `secret`, `password`, ...) at any depth
@@ -1332,7 +1334,7 @@ and press Enter. Each reply is a full agent turn, tools included.
   reply, open while it streams and collapsed after; it is never part of
   the reply. Thinking is ephemeral: it is not saved in the session, so a
   reload or reconnect drops it. Telegram and WeChat never show it.
-  nanobot-go does not turn Anthropic extended thinking on in its
+  Wally does not turn Anthropic extended thinking on in its
   requests, so the panel appears only for models or servers that think
   on their own.
 - **Markdown.** Assistant replies, streaming ones included, render as
@@ -1531,14 +1533,14 @@ The build has no inline scripts or styles, so the page keeps its strict
 CSP (`default-src 'self'; img-src 'self'`). `npm run dev` serves the app with hot reload
 on `http://localhost:5173/ui/` and proxies `/ws` and
 `/ui/{chats,status,settings,media,upload,auth,login,logout}` to a gateway already
-running on `127.0.0.1:18790`, or on `$NANOBOT_GO_GATEWAY_URL` if set
+running on `127.0.0.1:18790`, or on `$WALLY_GATEWAY_URL` if set
 (`nanobot webui --dev` sets it and starts the gateway if needed); the
 gateway itself never serves the dev server. The dev server listens on
 loopback, so its proxied requests count as local.
 
 ### OpenAI-compatible API
 
-nanobot-go can put the agent behind a minimal OpenAI-compatible endpoint,
+Wally can put the agent behind a minimal OpenAI-compatible endpoint,
 like nanobot's `nanobot serve`, so any OpenAI client library can talk to
 it. Each request is a full agent turn (tools, MCP servers, memory), not a
 bare model call.
@@ -1563,7 +1565,7 @@ the gateway then serves it next to the channels and the health endpoint.
 | `enabled` | Also run the API inside `nanobot gateway` (default `false`). `nanobot serve` ignores it. |
 | `host`, `port` | Where the API listens (default `127.0.0.1:8900`, nanobot's). `serve --host/--port` override them; port 0 picks a free port. |
 | `timeout` | Seconds one request's turn may take (default 120; `serve --timeout`). |
-| `apiKey` | When set, every route but `/health` requires `Authorization: Bearer <apiKey>`. `NANOBOT_GO_API_KEY` overrides it. |
+| `apiKey` | When set, every route but `/health` requires `Authorization: Bearer <apiKey>`. `WALLY_API_KEY` overrides it. |
 
 Endpoints:
 
@@ -1577,7 +1579,7 @@ Endpoints:
 
 ```sh
 curl http://127.0.0.1:8900/v1/chat/completions \
-  -H "Authorization: Bearer $NANOBOT_GO_API_KEY" \
+  -H "Authorization: Bearer $WALLY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "hi"}], "session_id": "my-session"}'
 ```
@@ -1692,7 +1694,7 @@ notification check against the provider, then delivery on the bus and
 
 ## Safety notes
 
-nanobot-go runs commands and edits files on your machine on the model's
+Wally runs commands and edits files on your machine on the model's
 behalf. Treat it like giving someone a shell.
 
 - The [WebUI](#webui) has no login for this device: any local user or
@@ -1723,7 +1725,7 @@ behalf. Treat it like giving someone a shell.
   `mkfs`, fork bombs, `shutdown`, ...) and requests to internal URLs. It is
   **best-effort pattern matching, not a sandbox**; a determined model can
   get around it. Turn on the process sandbox below, set
-  `tools.exec.enable: false`, or run nanobot-go in a container or VM if
+  `tools.exec.enable: false`, or run Wally in a container or VM if
   that matters to you.
 - `tools.exec.sandbox` runs every command in an OS sandbox after the shell
   guard has passed it: `"seatbelt"` on macOS (`/usr/bin/sandbox-exec`,
@@ -1731,7 +1733,7 @@ behalf. Treat it like giving someone a shell.
   `apt install bubblewrap`). Inside, the workspace is read-write, system
   directories (`/usr`, `/bin`, certificates, ...) are read-only, and the
   workspace's parent directory, which holds the config, keys and
-  sessions in the default layout (`~/.nanobot-go`), is hidden. `HOME`
+  sessions in the default layout (`~/.wally`), is hidden. `HOME`
   points at the workspace (on macOS `TMPDIR` too; under bwrap `/tmp` is a
   private tmpfs). Network access is not restricted. A sandbox also turns
   on `restrictToWorkspace` for the file tools.
@@ -1750,7 +1752,7 @@ behalf. Treat it like giving someone a shell.
   the hidden parent. Absolute paths under these binds also pass the shell
   guard. The sandbox **fails closed**: if the backend is unknown, built
   for another OS, missing, or cannot start a sandboxed process (for
-  example without unprivileged user namespaces), nanobot-go refuses to
+  example without unprivileged user namespaces), Wally refuses to
   start instead of running commands unsandboxed. `nanobot status` shows
   whether the configured sandbox is usable.
 - `web_fetch`, MCP HTTP/SSE clients and remote media URLs (Telegram's
@@ -1763,7 +1765,7 @@ behalf. Treat it like giving someone a shell.
 - The config file and session database are written with mode `0600`
   (its directory `0700`).
   `nanobot status` reports which keys are set, never their values.
-- MCP servers are code you chose to run, with your privileges; nanobot-go
+- MCP servers are code you chose to run, with your privileges; Wally
   does not sandbox them. Stdio servers get a minimal environment (`HOME`,
   `PATH`, `SHELL`, `TERM`, `USER`, locale and temp variables) plus their
   `env`, never the agent's API keys. `nanobot status` shows MCP `env` and
@@ -1777,7 +1779,7 @@ behalf. Treat it like giving someone a shell.
   `127.0.0.1` unless `gateway.host` says otherwise. It reveals only that
   the process is up. Channel sections may hold bot tokens; `status` never
   prints them.
-- The Telegram bot token is part of every Bot API URL. nanobot-go never
+- The Telegram bot token is part of every Bot API URL. Wally never
   logs request URLs and replaces the token with `<redacted>` in every
   error, so it does not show up in the gateway's log. Anyone allowed to
   talk to the bot (by `allowFrom`, `"*"` or an approved pairing) gets the

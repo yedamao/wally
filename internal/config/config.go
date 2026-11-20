@@ -1,4 +1,4 @@
-// Package config loads, validates and saves nanobot-go's JSON config file.
+// Package config loads, validates and saves Wally's JSON config file.
 // Its shape mirrors nanobot/config/schema.py where it makes sense:
 //
 //	{"agents": {"defaults": {...}}, "providers": {...}, "tools": {...},

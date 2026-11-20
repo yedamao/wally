@@ -74,7 +74,7 @@ func TestGatewayBackground(t *testing.T) {
 }
 
 // TestGatewayBackgroundUnmanaged refuses to start next to a gateway that
-// has no state file (an older nanobot-go).
+// has no state file (an older Wally).
 func TestGatewayBackgroundUnmanaged(t *testing.T) {
 	e := newTestEnv(t)
 	e.writeWebUIConfig(t, fakeGateway(t, false), false)

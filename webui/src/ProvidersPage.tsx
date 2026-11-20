@@ -54,7 +54,7 @@ export function ProvidersPage() {
         <Fill text={t("providers.savedTo")} vars={{ path: <code>providers.&lt;name&gt;</code> }} />{" "}
         <Fill
           text={t("providers.envWins")}
-          vars={{ key: <code>NANOBOT_GO_&lt;NAME&gt;_API_KEY</code>, base: <code>_API_BASE</code> }}
+          vars={{ key: <code>WALLY_&lt;NAME&gt;_API_KEY</code>, base: <code>_API_BASE</code> }}
         />
       </p>
     </section>

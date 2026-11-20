@@ -21,7 +21,7 @@ func TestCompletionUsage(t *testing.T) {
 func TestCompletionScripts(t *testing.T) {
 	tests := map[string]string{
 		"bash":       "complete -F _nanobot",
-		"zsh":        "#compdef wally nanobot nanobot-go",
+		"zsh":        "#compdef wally nanobot",
 		"fish":       "complete -c $cmd",
 		"powershell": "Register-ArgumentCompleter",
 		"pwsh":       "Register-ArgumentCompleter",
@@ -34,7 +34,7 @@ func TestCompletionScripts(t *testing.T) {
 			if code != 0 || !strings.Contains(out, marker) {
 				t.Fatalf("code %d, stdout %q, stderr %q", code, e.stdout.String(), e.stderr.String())
 			}
-			for _, name := range []string{"wally", "nanobot", "nanobot-go"} {
+			for _, name := range []string{"wally", "nanobot"} {
 				if !strings.Contains(out, name) {
 					t.Errorf("completion script does not register %q", name)
 				}

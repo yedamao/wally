@@ -1,6 +1,6 @@
 # Image generation
 
-nanobot-go can generate and edit images through the `generate_image` tool,
+Wally can generate and edit images through the `generate_image` tool,
 a port of nanobot's (see nanobot's `docs/image-generation.md`). It is off by
 default. Generated images are saved as workspace files; the agent delivers
 them with the `message` tool's `media`, so they reach Telegram (`sendPhoto`),
@@ -9,7 +9,7 @@ WeChat (CDN upload) and the WebUI like any other attachment.
 ## Quick setup
 
 Add the provider's key on the WebUI's Providers page (or in
-`~/.nanobot-go/config.json`), then enable the tool in the WebUI's Status
+`~/.wally/config.json`), then enable the tool in the WebUI's Status
 dialog: tick **generate_image tool**, pick the provider and model (and
 optionally the default aspect ratio, image size and max images per turn),
 Save, and restart the gateway — there is no live reload, so the dialog
@@ -42,9 +42,9 @@ For OpenAI's Images API instead:
 }
 ```
 
-Keys may also come from `NANOBOT_GO_OPENROUTER_API_KEY` /
-`NANOBOT_GO_OPENAI_API_KEY`, and `providers.<name>.apiBase` (or
-`NANOBOT_GO_<NAME>_API_BASE`) points the client at another endpoint. An
+Keys may also come from `WALLY_OPENROUTER_API_KEY` /
+`WALLY_OPENAI_API_KEY`, and `providers.<name>.apiBase` (or
+`WALLY_<NAME>_API_BASE`) points the client at another endpoint. An
 OpenAI-compatible Images API server (nanobot's `custom` provider) works as
 `provider: "openai"` with `providers.openai.apiBase` set.
 

@@ -54,7 +54,7 @@ type ProviderView struct {
 	// provider clients are built when it starts.
 	RestartRequired bool `json:"restart_required"`
 	// EnvOverrides names the fields ("apiKey", "apiBase") set by
-	// NANOBOT_GO_<NAME>_API_KEY / _API_BASE, which win over the file.
+	// WALLY_<NAME>_API_KEY / _API_BASE, which win over the file.
 	EnvOverrides []string `json:"env_overrides"`
 }
 

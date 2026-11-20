@@ -47,7 +47,7 @@ The app looks for a `wally` (or `nanobot`) binary in this order:
    websocket channel if needed, attaches to a managed gateway, starts an
    on-demand one, or restarts a managed gateway that was up without `/ui/`.
 3. The window loads `/ui/` (default port **18790**, or whatever is in
-   `~/.nanobot-go/config.json`).
+   `~/.wally/config.json`).
 4. Quitting stops only a `wally webui` child this app started (releasing
    its lease). An already-running gateway is left alone.
 

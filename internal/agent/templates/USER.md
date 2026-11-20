@@ -24,4 +24,4 @@ Information about the user to help personalize interactions.
 
 ---
 
-*Edit this file to customize nanobot-go for your needs. While it is unchanged it is not sent to the model.*
+*Edit this file to customize Wally for your needs. While it is unchanged it is not sent to the model.*

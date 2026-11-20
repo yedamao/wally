@@ -80,7 +80,7 @@ func TestBundle(t *testing.T) {
 		return regexp.MustCompile("[\"'`]" + regexp.QuoteMeta(s) + "[\"'`]")
 	}
 	for _, lit := range []string{
-		"/ws", "?chat_id=", "nanobot-go.chatId",
+		"/ws", "?chat_id=", "wally.chatId",
 		"hello", "history", "progress", "delta", "message", "error", "chat", "stop",
 		"chats", "chats/", "PATCH", "DELETE", "status", "settings",
 		"noopener noreferrer", "hljs", // markdown links and code highlighting

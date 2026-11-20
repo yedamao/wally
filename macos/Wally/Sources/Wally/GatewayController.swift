@@ -124,11 +124,20 @@ final class GatewayController {
     }
 
     func configPath() -> String {
-        if let env = ProcessInfo.processInfo.environment["NANOBOT_GO_CONFIG"], !env.isEmpty {
-            return (env as NSString).expandingTildeInPath
+        let env = ProcessInfo.processInfo.environment
+        for key in ["WALLY_CONFIG", "NANOBOT_GO_CONFIG"] {
+            if let value = env[key], !value.isEmpty {
+                return (value as NSString).expandingTildeInPath
+            }
         }
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/.nanobot-go/config.json"
+        let current = "\(home)/.wally/config.json"
+        let legacy = "\(home)/.nanobot-go/config.json"
+        let fm = FileManager.default
+        if fm.fileExists(atPath: "\(home)/.wally") || !fm.fileExists(atPath: legacy) {
+            return current
+        }
+        return legacy
     }
 
     // MARK: - Private
@@ -222,7 +231,7 @@ final class GatewayController {
         proc.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
         var env = ProcessInfo.processInfo.environment
-        env["NANOBOT_GO_CLI_NAME"] = "wally"
+        env["WALLY_CLI_NAME"] = "wally"
         proc.environment = env
 
         let out = Pipe()
@@ -331,7 +340,7 @@ final class GatewayController {
                 .failed(
                     "The WebUI did not become ready in time.\n\n" +
                         "Check that nothing else is using port \(port), " +
-                        "and that ~/.nanobot-go/config.json is valid.\n\n" +
+                        "and that ~/.wally/config.json is valid.\n\n" +
                         (logTail.isEmpty ? "No process output was captured." : logTail)
                 ),
                 url: nil

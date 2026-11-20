@@ -124,7 +124,7 @@ func TestWebModelsFallBackToCurated(t *testing.T) {
 
 	// A failing fetch: the curated list with the status, never the key.
 	const envKey = "sk-env-fixture-deepseek-key"
-	s = testModels(t, path, map[string]string{"NANOBOT_GO_DEEPSEEK_API_KEY": envKey}, func(r *http.Request) (*http.Response, error) {
+	s = testModels(t, path, map[string]string{"WALLY_DEEPSEEK_API_KEY": envKey}, func(r *http.Request) (*http.Response, error) {
 		if r.URL.String() != "https://api.deepseek.com/models" || r.Header.Get("Authorization") != "Bearer "+envKey {
 			t.Errorf("request = %s %v", r.URL, r.Header)
 		}
@@ -234,7 +234,7 @@ func TestWebModelsTestProviderFailures(t *testing.T) {
 	}
 
 	// The environment's key is tested, as the gateway would run.
-	env := map[string]string{"NANOBOT_GO_DEEPSEEK_API_KEY": envSecret}
+	env := map[string]string{"WALLY_DEEPSEEK_API_KEY": envSecret}
 	var auth string
 	s = testModels(t, writeSettingsConfig(t), env, func(r *http.Request) (*http.Response, error) {
 		auth = r.Header.Get("Authorization")

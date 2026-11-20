@@ -195,7 +195,7 @@ export function ChannelsPage() {
           <Fill text={t("channels.savedTo")} vars={{ path: <code>channels.&lt;name&gt;</code> }} />{" "}
           <Fill
             text={t("channels.envWins")}
-            vars={{ telegram: <code>NANOBOT_GO_TELEGRAM_TOKEN</code>, weixin: <code>NANOBOT_GO_WEIXIN_TOKEN</code> }}
+            vars={{ telegram: <code>WALLY_TELEGRAM_TOKEN</code>, weixin: <code>WALLY_WEIXIN_TOKEN</code> }}
           />{" "}
           {t("channels.websocketNote")}
         </p>

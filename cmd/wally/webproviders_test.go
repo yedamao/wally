@@ -39,7 +39,7 @@ func providerByName(t *testing.T, list websocket.ProvidersList, name string) web
 
 func TestWebProvidersListRedacts(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningProviders(t, path, map[string]string{"NANOBOT_GO_DEEPSEEK_API_BASE": "http://localhost:9/v1"})
+	s := runningProviders(t, path, map[string]string{"WALLY_DEEPSEEK_API_BASE": "http://localhost:9/v1"})
 	list, err := s.Providers()
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +113,7 @@ func TestWebProvidersUpdate(t *testing.T) {
 
 func TestWebProvidersEnvOverrideRestart(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningProviders(t, path, map[string]string{"NANOBOT_GO_OPENAI_API_KEY": envSecret})
+	s := runningProviders(t, path, map[string]string{"WALLY_OPENAI_API_KEY": envSecret})
 	// The environment's key wins, so a saved change needs no restart.
 	v, err := s.UpdateProvider("openai", websocket.ProviderPatch{APIKey: ptr("sk-another-fixture-key")})
 	if err != nil || v.RestartRequired || !slices.Equal(v.EnvOverrides, []string{"apiKey"}) {

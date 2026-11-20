@@ -128,7 +128,7 @@ func helperCommand(argsFile string) func(name string, args ...string) *exec.Cmd 
 
 // TestWebUIHelperProcess is not a test: it is the fake gateway (args
 // "gateway ... --port n") or fake Vite ("run dev -- --host h --port n
-// --strictPort", which needs $NANOBOT_GO_GATEWAY_URL) the launcher
+// --strictPort", which needs $WALLY_GATEWAY_URL) the launcher
 // tests start. It serves until interrupted.
 func TestWebUIHelperProcess(t *testing.T) {
 	if os.Getenv("NANOBOT_WEBUI_HELPER") == "" {

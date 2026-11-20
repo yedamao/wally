@@ -20,7 +20,9 @@ const (
 	// session key prefix.
 	Name = "weixin"
 	// EnvToken overrides channels.weixin.token.
-	EnvToken = "NANOBOT_GO_WEIXIN_TOKEN"
+	EnvToken = "WALLY_WEIXIN_TOKEN"
+	// LegacyEnvToken is accepted for one release when EnvToken is unset.
+	LegacyEnvToken = "NANOBOT_GO_WEIXIN_TOKEN"
 	// DefaultBaseURL is Tencent's iLink bot API.
 	DefaultBaseURL = "https://ilinkai.weixin.qq.com"
 	// DefaultPollTimeout is the getupdates long-poll timeout in seconds
@@ -52,7 +54,7 @@ type Config struct {
 	Enabled bool `json:"enabled"`
 	// Token is a bot token. Usually it is left empty and comes from the
 	// state saved by `nanobot channels login weixin`;
-	// NANOBOT_GO_WEIXIN_TOKEN overrides it.
+	// WALLY_WEIXIN_TOKEN (or legacy NANOBOT_GO_WEIXIN_TOKEN) overrides it.
 	Token string `json:"token"`
 	// AllowFrom lists the WeChat user IDs allowed to talk to the bot, or
 	// "*" for everyone. Empty allows only senders approved through
@@ -96,6 +98,24 @@ func (r *routeTag) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// TokenFromEnv returns WALLY_WEIXIN_TOKEN, or legacy NANOBOT_GO_WEIXIN_TOKEN
+// when the current name is unset. getenv may be nil.
+func TokenFromEnv(getenv func(string) string) string {
+	if getenv == nil {
+		return ""
+	}
+	if v := getenv(EnvToken); v != "" {
+		return v
+	}
+	return getenv(LegacyEnvToken)
+}
+
+// IsTokenEnv reports whether k is the current or legacy WeChat token
+// environment variable name.
+func IsTokenEnv(k string) bool {
+	return k == EnvToken || k == LegacyEnvToken
+}
+
 // ParseConfig decodes a channels.weixin section, applies the token's
 // environment override (getenv may be nil) and the defaults, and
 // validates it. A missing token is not an error here: it can come from
@@ -105,10 +125,8 @@ func ParseConfig(raw json.RawMessage, getenv func(string) string) (Config, error
 	if err := channels.DecodeConfig(raw, &cfg); err != nil {
 		return Config{}, err
 	}
-	if getenv != nil {
-		if v := getenv(EnvToken); v != "" {
-			cfg.Token = v
-		}
+	if v := TokenFromEnv(getenv); v != "" {
+		cfg.Token = v
 	}
 	cfg.Token = strings.TrimSpace(cfg.Token)
 	if cfg.BaseURL == "" {

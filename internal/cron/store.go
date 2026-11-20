@@ -114,7 +114,7 @@ func (s *Store) read() ([]Job, error) {
 		return nil, fmt.Errorf("cron store %s is corrupt (fix or remove it; it will not be overwritten): %w", s.Path(), err)
 	}
 	if f.Version > storeVersion {
-		return nil, fmt.Errorf("cron store %s has version %d; this nanobot-go understands up to %d", s.Path(), f.Version, storeVersion)
+		return nil, fmt.Errorf("cron store %s has version %d; this Wally understands up to %d", s.Path(), f.Version, storeVersion)
 	}
 	return f.Jobs, nil
 }

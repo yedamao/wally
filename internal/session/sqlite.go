@@ -171,7 +171,7 @@ func (s *SQLiteStore) init(importDir string) error {
 	}
 	migrations := sqliteMigrations()
 	if version > len(migrations) {
-		return fmt.Errorf("schema version %d is newer than this nanobot-go supports (%d); upgrade nanobot-go", version, len(migrations))
+		return fmt.Errorf("schema version %d is newer than this Wally supports (%d); upgrade Wally", version, len(migrations))
 	}
 	for v := version; v < len(migrations); v++ {
 		if err := migrations[v](tx); err != nil {

@@ -258,7 +258,7 @@ func (a *auth) public(next http.Handler) http.Handler {
 }
 
 func unauthorized(w http.ResponseWriter) {
-	w.Header().Set("WWW-Authenticate", `Bearer realm="nanobot-go"`)
+	w.Header().Set("WWW-Authenticate", `Bearer realm="wally"`)
 	http.Error(w, "sign in required", http.StatusUnauthorized)
 }
 

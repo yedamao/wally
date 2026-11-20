@@ -1,12 +1,12 @@
 # Porting nanobot to Go
 
-nanobot-go is a Go rewrite of [HKUDS/nanobot](https://github.com/HKUDS/nanobot).
+Wally is a Go rewrite of [HKUDS/nanobot](https://github.com/HKUDS/nanobot).
 This document maps the Python packages to Go packages and records the order
 in which we port them.
 
 ## Package mapping
 
-| nanobot (Python)                         | nanobot-go (Go)                  | Notes |
+| nanobot (Python)                         | wally (Go)                  | Notes |
 |------------------------------------------|----------------------------------|-------|
 | `nanobot/bus` (`events.py`, `queue.py`)  | `internal/bus`                   | Inbound/outbound messages, `MessageBus` on channels |
 | `nanobot/agent/loop.py`                  | `internal/agent` (`Loop`)        | Channel-facing turn: session key, context, delivery |
@@ -153,7 +153,7 @@ Phase 2 is complete; phase 3 is in progress.
     `Restart=always`, `RestartSec=10`) running a foreground
     `gateway --config … --port n`, with nanobot's commands
     (bootstrap/enable/kickstart -k; daemon-reload/enable/restart).
-    Differences: names `nanobot-go-gateway` / `ai.nanobot-go.*` (nanobot's
+    Differences: names `wally-gateway` / `ai.wally.*` (nanobot's
     `nanobot-gateway` is refused) so both coexist; a fixed port is
     required; `go run` binaries are refused; `PATH` is copied into the
     service; the unit escapes `%`/`$`; install/start refuse while a
@@ -176,7 +176,7 @@ Phase 2 is complete; phase 3 is in progress.
     commands), `/cmd@bot` normalization, reply context, forum-topic
     sessions, plain-text chunking at 4096 UTF-16 units, typing indicator,
     token redaction; config `channels.telegram` (`token` or
-    `NANOBOT_GO_TELEGRAM_TOKEN`, `allowFrom`, `apiBase`, `pollTimeout`,
+    `WALLY_TELEGRAM_TOKEN`, `allowFrom`, `apiBase`, `pollTimeout`,
     `proxy`, `groupPolicy`, `replyToMessage`, `inlineKeyboards`), a
     `status` token row.
     `internal/pairing` (`pairing.json` next to the config, flock + atomic
@@ -338,7 +338,7 @@ Phase 2 is complete; phase 3 is in progress.
     (`nanobot channels login weixin [--force]`: `get_bot_qrcode` with
     `local_token_list`, `get_qrcode_status` with redirect host,
     verification code, refresh and binding statuses); config
-    `channels.weixin` (`token` or `NANOBOT_GO_WEIXIN_TOKEN`, `allowFrom`,
+    `channels.weixin` (`token` or `WALLY_WEIXIN_TOKEN`, `allowFrom`,
     `baseUrl`, `routeTag`, `stateDir`, `pollTimeout`) and a `status` login
     row.
   - Not ported (WeChat): voice transcription (only WeChat's own
@@ -386,7 +386,7 @@ Phase 2 is complete; phase 3 is in progress.
     of a non-loopback host without a key, body cap, per-turn timeout,
     nanobot's error JSON, `X-Request-ID`), `Loop.Process` (the reply with
     the turn's token usage), config `api` (`enabled`, `host`, `port`,
-    `timeout`, `apiKey`; `NANOBOT_GO_API_KEY`), `nanobot serve`
+    `timeout`, `apiKey`; `WALLY_API_KEY`), `nanobot serve`
     (`--host`/`--port`/`--timeout`), the API inside the gateway when
     `api.enabled`, a `status` row; `security.IsLoopbackHost`.
   - Not ported: file uploads (multipart and base64 images), token
@@ -565,7 +565,7 @@ Phase 2 is complete; phase 3 is in progress.
     `proxy` and `stateDir` are kept but not editable; only telegram and
     weixin exist.
   - Done (different): restart from the WebUI. nanobot's page sends a
-    silent `/restart` command; nanobot-go has `GET /ui/gateway`
+    silent `/restart` command; wally has `GET /ui/gateway`
     (`launch_mode`, `lifetime`, `restart_available`/reason) and an
     auth-gated, same-origin `POST /ui/gateway/restart`. Only a
     background gateway recorded as the serving process can restart: the
@@ -677,11 +677,11 @@ Phase 2 is complete; phase 3 is in progress.
     `channels.websocket.token`, `tokenIssueSecret` (also
     `token_issue_secret`) and `websocketRequiresToken`. As in nanobot, a
     non-loopback `gateway.host` needs a secret (nanobot only checks the
-    wildcard hosts; nanobot-go checks every non-loopback host, like its
+    wildcard hosts; wally checks every non-loopback host, like its
     `api` package). Requests from this device (loopback `Host`, loopback
     peer, no proxy forwarding header) need no sign-in unless
     `websocketRequiresToken` is true; nanobot instead requires the token
-    for every handshake by default, which nanobot-go keeps off so the
+    for every handshake by default, which wally keeps off so the
     local workflow is unchanged. Everyone else presents a secret
     (`Authorization: Bearer`, `X-Nanobot-Auth`, or `?token=` on `/ws`)
     or the `httpOnly` `SameSite=Strict` session cookie set by
@@ -865,12 +865,12 @@ Phase 2 is complete; phase 3 is in progress.
 - **Forced final answer keeps tools defined.** After the iteration budget is
   spent, nanobot sends the finalization request with `tools=None`. Anthropic
   rejects a request whose history contains `tool_use`/`tool_result` blocks
-  but defines no tools, so nanobot-go keeps the definitions and sends
+  but defines no tools, so wally keeps the definitions and sends
   `tool_choice: none` (supported by both Anthropic and OpenAI). Tool calls in
   that response are still ignored and replaced by the fallback message.
 - **exec passes PATH.** Like nanobot, commands get a minimal environment
   plus `tools.exec.allowedEnvKeys`, never the agent's API keys. nanobot
-  relies on a login shell to rebuild PATH; nanobot-go runs `sh -c`, so
+  relies on a login shell to rebuild PATH; wally runs `sh -c`, so
   PATH (and a few locale/temp variables) are passed through as well.
 - **Security is a feature.** Workspace containment and the shell guard live
   in the tools from day one; the shell guard is best-effort and not a sandbox.
@@ -885,33 +885,33 @@ Phase 2 is complete; phase 3 is in progress.
 - **No package-level mutable state.** Everything is wired explicitly with
   `context.Context` for cancellation.
 - **Consolidation runs before the turn, in the Loop.** nanobot's
-  `ContextGovernor` can compact inside a running request. nanobot-go keeps
+  `ContextGovernor` can compact inside a running request. wally keeps
   the Runner unaware of memory: before each turn the Loop asks its
   `memory.Consolidator` to `Plan` (more than `maxHistoryMessages`
   unsummarized messages, or an estimated prompt over
   `contextWindowTokens` minus `maxTokens` minus 1024) and `Consolidate`.
   A single turn that outgrows the window mid-run is not compacted.
 - **Consolidation keeps recent turns verbatim.** nanobot's checkpoint
-  archives the whole accepted prefix. nanobot-go archives up to the start
+  archives the whole accepted prefix. wally archives up to the start
   of a user turn and keeps the newest turns that fit in half of each limit
   (at least the latest turn), so consolidation does not repeat every turn
   and the replay always starts with a user message.
 - **The summarizer sees a plain-text transcript.** nanobot replays the
-  messages (with tool definitions) and asks for a checkpoint. nanobot-go
+  messages (with tool definitions) and asks for a checkpoint. wally
   renders them as text (`USER: ...`, `[tool call] ...`, each message capped
   at 4000 characters, the middle dropped if the window is too small), so the
   request has no tool_use/tool_result pairing constraints and no tools.
 - **No hidden marker message.** nanobot inserts a hidden user message at
-  the boundary; nanobot-go stores only the index (`last_consolidated` in
+  the boundary; wally stores only the index (`last_consolidated` in
   the session file's metadata line) and the summary (`last_summary`). A
   marker out of range on load is reset to 0, replaying everything.
 - **No raw-archive fallback.** When summarization fails, nanobot dumps the
-  raw messages into `history.jsonl` and advances. nanobot-go leaves the
+  raw messages into `history.jsonl` and advances. wally leaves the
   marker where it is, logs the error, and replays the plain
   `maxHistoryMessages` window for that turn; the next turn retries. Nothing
   is written to `history.jsonl` and no message is lost.
 - **`history.jsonl` cursors come from a full scan.** nanobot keeps a cursor
-  counter file; nanobot-go scans the file for the highest valid cursor on
+  counter file; wally scans the file for the highest valid cursor on
   each append (appends are rare). Appends and compaction are serialized
   within a process by a mutex and across processes by an flock on
   `memory/.history.lock` (Unix only), so an append can neither reuse a
@@ -926,19 +926,19 @@ Phase 2 is complete; phase 3 is in progress.
   the turn as a `DreamRunFunc` so it does not import `agent`.
 - **Dream sees longer entries.** nanobot cuts each history entry in the
   Dream prompt to 1000 characters; once the cursor moves, the rest is
-  never seen again. nanobot-go cuts at 8000 characters, about the default
+  never seen again. wally cuts at 8000 characters, about the default
   summary limit. Entries also show their session key.
 - **A corrupt `.dream_cursor` is an error.** nanobot reads it as 0, which
-  replays the whole archive. nanobot-go refuses to run (or to compact) and
+  replays the whole archive. wally refuses to run (or to compact) and
   asks for the file to be fixed or deleted.
 - **Dream's write restriction is a wrapper.** nanobot gives its file tools
-  an allowed directory plus extra allowed files. nanobot-go wraps the
+  an allowed directory plus extra allowed files. wally wraps the
   ordinary `write_file`/`edit_file` in a guard that resolves the target
   through symlinks and accepts only `SOUL.md`, `USER.md`,
   `memory/MEMORY.md` and `skills/...`. The tool resolves the path again,
   so only a symlink swapped in between by another process could redirect
   the write (still within the workspace). There is no `apply_patch` tool.
-- **Git through the `git` binary.** nanobot uses dulwich. nanobot-go runs
+- **Git through the `git` binary.** nanobot uses dulwich. wally runs
   `git` (30s timeout per command, `GIT_DIR`-style variables removed,
   hooks and signing skipped, author `nanobot <nanobot@dream>`). A missing
   binary is a logged no-op. Like nanobot, a workspace inside another
@@ -951,18 +951,18 @@ Phase 2 is complete; phase 3 is in progress.
 - **Trimming runs after every pass**, including one with nothing to
   process, like nanobot's `finally` block.
 - **The workspace ID comes from its path.** nanobot stores a random ID in
-  the workspace to locate its session database. nanobot-go hashes the
+  the workspace to locate its session database. wally hashes the
   canonical workspace path instead, so the workspace is never written to;
   a moved workspace starts with an empty database (the old one stays on
   disk under the previous ID).
 - **The JSONL import reads one directory.** nanobot also imports
-  `<workspace>/sessions/*.jsonl` from older layouts; nanobot-go never kept
+  `<workspace>/sessions/*.jsonl` from older layouts; wally never kept
   sessions in the workspace, so it imports only the flat files in its
   sessions directory. As in nanobot, one unreadable or duplicate file
   aborts the whole import and leaves the sources unchanged.
 - **Streaming is a request option.** nanobot's
   providers have a streaming chat method and its progress hook emits
-  `StreamDeltaEvent`/`StreamEndEvent`. nanobot-go adds
+  `StreamDeltaEvent`/`StreamEndEvent`. wally adds
   `ChatRequest.OnDelta`: the OpenAI-compatible provider then streams
   (`stream_options.include_usage` for the usage; keep-alives, a missing
   `[DONE]`, tool calls without `index` and servers that ignore `stream`
@@ -1020,12 +1020,12 @@ Phase 2 is complete; phase 3 is in progress.
   resets the tokens and client, as nanobot's `reset`.
 - **Tools only.** With `enabledTools: ["*"]` nanobot also registers each
   resource as a read-only `mcp_<server>_resource_<name>` tool and each
-  prompt as `mcp_<server>_prompt_<name>`. nanobot-go skips both: each needs
+  prompt as `mcp_<server>_prompt_<name>`. wally skips both: each needs
   its own wrapper, naming, result rendering and reconnect handling, and
   most servers are used for their tools. Planned as a follow-up.
 - **Images are described, not stored.** nanobot saves image results as
   artifacts and tells the model to deliver them with the message tool.
-  nanobot-go has the message tool but no artifacts yet, so images, audio and
+  wally has the message tool but no artifacts yet, so images, audio and
   blobs become a placeholder (`[image: image/png, 5120 bytes]`); text
   resources embedded in a result are inlined.
 - **SSE is supported** through the SDK, inferred like nanobot from a URL
@@ -1035,18 +1035,18 @@ Phase 2 is complete; phase 3 is in progress.
   ranges blocked unless in `tools.ssrfWhitelist`), DNS is pinned and
   every request and redirect is validated; with an environment proxy the
   URL is checked locally and the proxy connects. nanobot also probes the
-  port before connecting; nanobot-go's per-server connect timeout
-  replaces the probe. (Before phase 4b nanobot-go trusted MCP URLs as
+  port before connecting; wally's per-server connect timeout
+  replaces the probe. (Before phase 4b wally trusted MCP URLs as
   configured; local HTTP servers now need a whitelist entry.)
 - **Concurrent connects with a timeout.** nanobot connects servers one by
-  one with no overall limit. nanobot-go connects them concurrently, each
+  one with no overall limit. wally connects them concurrently, each
   within 30 seconds (10 in `status --mcp`). A failed server is not retried
   in the background (nanobot retries on its next readiness check); calling
   one of its tools, if it ever registered any, reconnects at most once per
   30 seconds.
 - **Reconnect keeps the registrations.** On a terminated session nanobot
   unregisters the server's tools, reconnects and registers them again.
-  nanobot-go's wrappers look up the server's current session on every
+  wally's wrappers look up the server's current session on every
   call, so a reconnect touches no registry state and the tool list (and
   prompt cache) stays stable mid-run. Tools added or removed on the server
   after the first connection appear only after a restart. nanobot's
@@ -1056,28 +1056,28 @@ Phase 2 is complete; phase 3 is in progress.
   never by the server rejecting a call. Concurrent calls share one
   reconnect.
 - **Close cancels in-flight calls.** The SDK's session `Close` waits for
-  outstanding calls; nanobot-go cancels them first, so shutdown does not
+  outstanding calls; wally cancels them first, so shutdown does not
   wait for a slow tool. Stdio servers get their stdin closed, then
   SIGTERM, then SIGKILL, 2 seconds apart.
 - **Collisions are skipped, not overwritten.** nanobot's registry replaces
-  a tool registered under the same name. nanobot-go keeps the first tool
+  a tool registered under the same name. wally keeps the first tool
   (built-ins always win) and logs the skipped one. Sanitizing matches
   nanobot (invalid characters to `_`, runs of `_` collapsed); a name over
   64 characters ends in 8 hex digits of the SHA-1 of the *unsanitized*
   name (nanobot hashes the sanitized one), so two tools that differ only
   in punctuation still get distinct long names.
 - **`readOnlyHint` is honored.** nanobot treats every MCP tool as having
-  side effects. nanobot-go marks a tool read-only when the server
+  side effects. wally marks a tool read-only when the server
   annotates it `readOnlyHint: true`, which only lets it run alongside other
   read-only tools in the same batch.
 - **Schemas: refs are inlined.** nanobot hoists arbitrary local JSON
-  pointers into `$defs` and keeps `$ref`. nanobot-go inlines local refs
+  pointers into `$defs` and keeps `$ref`. wally inlines local refs
   (better for providers without `$ref` support) and drops `$defs`/
   `definitions` when nothing refers to them; recursive or unresolvable
   refs stay as `$ref` with their definitions. Nullable unions are
   flattened with `"nullable": true` as in nanobot.
 - **`${VAR}` only in the MCP entry, at connect time.** nanobot resolves
-  `${VAR}` across the whole config when loading it. nanobot-go expands
+  `${VAR}` across the whole config when loading it. wally expands
   `args`, `env`, `url` and `headers` of each MCP server when it connects;
   an unset variable fails only that server, and `nanobot status` works
   without the variables set.
@@ -1086,7 +1086,7 @@ Phase 2 is complete; phase 3 is in progress.
   `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER` (plus `TMPDIR`,
   locale and Windows essentials) and their `env`. nanobot's Windows
   wrapping of `npx`/`.cmd` launchers in `cmd /c` is not ported. Server
-  stderr is inherited by nanobot; nanobot-go keeps its last 2 KB for the
+  stderr is inherited by nanobot; wally keeps its last 2 KB for the
   connection error and forwards it only with `--verbose`.
 - **Secrets are redacted from errors.** Configured env and header values,
   the URL query and password are replaced with `[redacted]` in connection
@@ -1096,7 +1096,7 @@ Phase 2 is complete; phase 3 is in progress.
 
 - **Health at `/healthz`, plain liveness.** nanobot serves `GET /health`
   with a readiness payload (`status`, `process`, `ready`, `websocket`) and
-  503 when the WebSocket channel is down. nanobot-go serves `/healthz`
+  503 when the WebSocket channel is down. wally serves `/healthz`
   and `/health` with `{"status":"ok"}` while the process is up; readiness
   arrives with channels that need it. It uses `net/http` with 2-second
   timeouts instead of nanobot's hand-written HTTP/1.0 server and its
@@ -1105,7 +1105,7 @@ Phase 2 is complete; phase 3 is in progress.
   Port 0 (any free port) is accepted.
 - **In-flight turns get a deadline.** nanobot cancels running tasks on
   shutdown (keeping checkpoints so a later gateway can offer to
-  continue). nanobot-go stops consuming inbound messages, lets the turns
+  continue). wally stops consuming inbound messages, lets the turns
   in flight finish for `gateway.shutdownTimeout` seconds (new; default
   30), then cancels them; their replies are still delivered before the
   channels stop. Messages still queued on the bus are not processed.
@@ -1124,7 +1124,7 @@ Phase 2 is complete; phase 3 is in progress.
   logged and skipped, like nanobot, but is not retried.
 - **One sender per channel.** nanobot schedules one task per message
   with FIFO per `(channel, chat_id)` and global limits (32 sends, 256
-  pending). nanobot-go gives each channel one sender goroutine with a
+  pending). wally gives each channel one sender goroutine with a
   256-message queue: FIFO per channel, and a channel that is slow or
   retrying does not hold up the others (but does hold up its own chats).
 - **Fixed retry policy.** Sends are attempted four times, waiting 1s, 2s
@@ -1135,7 +1135,7 @@ Phase 2 is complete; phase 3 is in progress.
 - **No delivery outbox; minimal progress and streaming.** nanobot
   persists scheduled deliveries in `delivery/outbox.sqlite3`, streams
   deltas (editing Telegram messages as they grow), sends progress/tool
-  hints/reasoning, and suppresses duplicate replies. nanobot-go delivers
+  hints/reasoning, and suppresses duplicate replies. wally delivers
   final replies plus one-string tool hints marked as progress
   (`bus.IsProgress`), streamed deltas (`bus.IsDelta`) and thinking
   (`bus.IsThinking`, `bus.IsThinkingEnd`), which are tried once and
@@ -1145,7 +1145,7 @@ Phase 2 is complete; phase 3 is in progress.
   warning.
 - **Channel config is a raw object per channel.** nanobot's `channels`
   section also has global keys (`sendProgress`, `sendToolHints`,
-  `sendMaxRetries`, ...) next to the channel sections; nanobot-go only
+  `sendMaxRetries`, ...) next to the channel sections; wally only
   has channel sections, each a JSON object with `enabled`, decoded
   strictly by the channel's factory. Multi-instance channels and plugin
   discovery are not ported; channels register with a `channels.Registry`
@@ -1157,7 +1157,7 @@ Phase 2 is complete; phase 3 is in progress.
 
 ### Telegram and pairing
 
-- **No SDK.** nanobot uses python-telegram-bot; nanobot-go calls the Bot
+- **No SDK.** nanobot uses python-telegram-bot; wally calls the Bot
   API with `net/http` and JSON bodies. Only long polling is supported
   (nanobot also has `mode: "webhook"`). Like PTB's `start_polling`, a
   webhook still set on the bot is deleted at startup (pending updates are
@@ -1178,7 +1178,7 @@ Phase 2 is complete; phase 3 is in progress.
   unbalanced: the cut moves before the fence, or a long block is closed
   and reopened), and a chunk whose HTML is over Telegram's 4096 is split
   again with a smaller budget, so HTML is never cut through a tag;
-  nanobot-go counts both limits in UTF-16 code units, as Telegram does,
+  wally counts both limits in UTF-16 code units, as Telegram does,
   where nanobot counts code points. Captions (nanobot sends none) are
   rendered the same way, with `parse_mode: HTML`; text rides on a file
   only when both its HTML and its raw form fit in 1024 units, and a
@@ -1191,7 +1191,7 @@ Phase 2 is complete; phase 3 is in progress.
   chunks can appear twice (as in nanobot).
 - **Inbound media.** nanobot downloads photos, voice, audio, documents
   and video (transcribing voice), forwards locations and merges media
-  groups. nanobot-go handles text, captions, photos, voice notes and
+  groups. wally handles text, captions, photos, voice notes and
   audio files (transcribed through OpenAI's Whisper only, when
   `providers.openai` has a key, where nanobot defaults to Groq), videos,
   video notes, animations, documents and stickers (saved and attached,
@@ -1202,14 +1202,14 @@ Phase 2 is complete; phase 3 is in progress.
 - **Access check.** As in nanobot: `"*"`, then the sender ID
   (`id|username`, or `id`) and its ID or username parts in `allowFrom`,
   then the pairing store; an empty list denies everyone not paired.
-  nanobot-go also accepts `@name` and matches usernames
+  wally also accepts `@name` and matches usernames
   case-insensitively (Telegram usernames are case-insensitive), and
   accepts numbers in `allowFrom`. In groups the mention/reply check runs
   before the access check, so chatter not meant for the bot is not logged
   as "access denied" (nanobot checks access first; the outcome is the
   same: no reply).
 - **Commands.** nanobot registers a command menu and handles `/start`
-  and `/help` itself, forwarding the rest. nanobot-go answers `/start`
+  and `/help` itself, forwarding the rest. wally answers `/start`
   with nanobot's greeting and forwards every other command (`/help`
   included) to the loop, which knows `/new`, `/compact` and `/help`.
   `/cmd@other_bot` is ignored instead of being treated as `/cmd`.
@@ -1218,11 +1218,11 @@ Phase 2 is complete; phase 3 is in progress.
 - **Topic sessions only in topics.** nanobot scopes the session to
   `telegram:<chat>:topic:<thread>` whenever a message has a
   `message_thread_id`, which in a regular supergroup also happens for
-  reply threads, splitting one group into many sessions. nanobot-go does
+  reply threads, splitting one group into many sessions. wally does
   it only for topic messages (`is_topic_message`), and only then sends
   replies with `message_thread_id`.
 - **Typing indicator, no reaction.** Both show "typing…" every 4 seconds
-  until the reply; nanobot-go also stops it after 10 minutes. nanobot's
+  until the reply; wally also stops it after 10 minutes. nanobot's
   👀 reaction on received messages (`reactEmoji`) is not ported.
 - **Retries.** `sendMessage` waits out 429 `retry_after` up to three
   attempts (nanobot: `_SEND_MAX_RETRIES`, also on timeouts); 400 and 403
@@ -1241,7 +1241,7 @@ Phase 2 is complete; phase 3 is in progress.
   it is used in a URL, never logged, and replaced with `<redacted>` in
   every error (including `*url.Error`, which quotes the URL, and error
   descriptions). Errors returned by the client keep only context errors
-  in their chain. `NANOBOT_GO_TELEGRAM_TOKEN` is new; nanobot resolves
+  in their chain. `WALLY_TELEGRAM_TOKEN` is new; nanobot resolves
   `${VAR}` references in the config instead.
 - **Pairing.** The store keeps nanobot's `pairing.json` layout
   (`approved` per channel, `pending` by code with Unix-second times,
@@ -1257,7 +1257,7 @@ Phase 2 is complete; phase 3 is in progress.
   `delivery_status` bookkeeping. The reply text points at the CLI.
 - **Config.** Ported keys: `enabled`, `token`, `allowFrom`, `proxy`,
   `groupPolicy`, `replyToMessage`, `inlineKeyboards`. New: `apiBase`,
-  `pollTimeout` (seconds; PTB's default is 10, nanobot-go's 30). Not
+  `pollTimeout` (seconds; PTB's default is 10, wally's 30). Not
   ported: `mode`, `webhook*`, `reactEmoji`, `connectionPoolSize`,
   `poolTimeout`, `streaming`, `richMessages`, `streamEditInterval`;
   as everywhere, unknown keys are an error. Proxies are `http`, `https`
@@ -1267,23 +1267,23 @@ Phase 2 is complete; phase 3 is in progress.
 
 - **No QR code in the gateway.** nanobot's channel starts an interactive
   QR login when it has no token, from inside `start()`. A gateway is
-  unattended, so nanobot-go's channel fails to start instead (logged, the
+  unattended, so wally's channel fails to start instead (logged, the
   gateway runs on) and points at `nanobot channels login weixin`. The
   login is a CLI command only; nanobot's WebUI connect flow
   (`connect.py`) is not ported.
 - **The login is printed as a link.** nanobot draws the QR code with the
-  `qrcode` package and falls back to printing the URL; nanobot-go always
+  `qrcode` package and falls back to printing the URL; wally always
   prints the link (with a `qrencode` example), since a QR encoder is not
   a small std-lib addition. The flow is nanobot's: `local_token_list`
   with the known tokens (empty with `--force`) and a retry without them on
   -3, `scaned_but_redirect` switching the polling host, `need_verifycode`
   prompting on stdin, `verify_code_blocked` and `expired` replacing the
   code up to three times, `binded_redirect` succeeding only without
-  `--force` and with a local token (nanobot-go also counts a configured
+  `--force` and with a local token (wally also counts a configured
   token). It also prints "Scanned" once for the `scaned` status.
 - **Token only in account.json.** nanobot also writes the QR token and
   base URL back into `config.json` (`_persist_connect_credentials`, for
-  the WebUI). nanobot-go keeps it only in `account.json`, under
+  the WebUI). wally keeps it only in `account.json`, under
   `state/weixin` next to the config file (nanobot: `~/.nanobot/weixin`),
   in nanobot's layout (`token`, `get_updates_buf`, `context_tokens`,
   `base_url`, `replaced_config_token_sha256`, plus `ilink_bot_id` and
@@ -1294,7 +1294,7 @@ Phase 2 is complete; phase 3 is in progress.
   token (nanobot starts it with empty state). `typing_tickets` are not
   persisted, and are dropped from a file nanobot wrote.
 - **Stale token.** nanobot stops the channel on -14 unless a replacement
-  login is already saved. nanobot-go keeps the channel up: sends fail
+  login is already saved. wally keeps the channel up: sends fail
   with a `Permanent` error, and the saved state is checked every 30
   seconds, so a `nanobot channels login weixin --force` takes effect
   without restarting the gateway.
@@ -1303,12 +1303,12 @@ Phase 2 is complete; phase 3 is in progress.
   per token, nanobot's `contextMessageBudget` default, not configurable)
   is held, up to three per user, and sent after the user's next message.
   nanobot raises as well (its manager retries, and its durable outbox owns
-  scheduled results); nanobot-go's `Send` returns nil, since retrying
+  scheduled results); wally's `Send` returns nil, since retrying
   within seconds cannot help. A held reply that then fails otherwise is
   dropped, like nanobot's.
 - **Partial deliveries.** nanobot tracks the chunks of each delivery
   already sent so a retry skips them, with `client_id`s derived from the
-  delivery. nanobot-go does the same keyed by chat and content for two
+  delivery. wally does the same keyed by chat and content for two
   minutes, since bus messages carry no delivery ID.
 - **Typing.** "typing…" starts when a message arrives (ticket from
   `getconfig`, cached for a random part of a day with backoff on failure,
@@ -1331,7 +1331,7 @@ Phase 2 is complete; phase 3 is in progress.
   header and is replaced with `<redacted>` in errors and error messages.
 - **Config.** Ported keys: `enabled`, `token`, `allowFrom`, `baseUrl`,
   `routeTag` (string or number), `stateDir`, `pollTimeout`. New:
-  `NANOBOT_GO_WEIXIN_TOKEN`. Not ported (an error, like every unknown
+  `WALLY_WEIXIN_TOKEN`. Not ported (an error, like every unknown
   key): `cdnBaseUrl` (no media), `sendProgress`, `sendToolHints`,
   `replyProgressMessages`, `replyProgressMaxMessages`,
   `contextMessageBudget`, `streaming`, `blockStreaming*`.
@@ -1390,7 +1390,7 @@ Phase 2 is complete; phase 3 is in progress.
 - **Remote media URLs.** As in nanobot, `http(s)` entries of `media`
   are passed through as they are, not fetched by the tool; the channel
   checks them against the SSRF policy at send time (Telegram, WeChat).
-  Other `scheme://` entries are refused. Unlike nanobot, nanobot-go's
+  Other `scheme://` entries are refused. Unlike nanobot, wally's
   WeChat and WebUI handle them too (see the channels).
 - **Generated images** (`generate_image`) are delivered through this
   tool: its artifacts are workspace paths the tool accepts as `media`.
@@ -1414,7 +1414,7 @@ Phase 2 is complete; phase 3 is in progress.
   (`provider`, `apiKey`, `maxResults`, `timeout`); registered only when
   `tools.web.enable` and the provider is `deepseek` (case-insensitive).
 - **Deviation: provider default.** nanobot defaults to `duckduckgo`;
-  nanobot-go defaults to `""` (no `web_search`), since the only provider
+  wally defaults to `""` (no `web_search`), since the only provider
   bills per call and needs a key.
 - **Deviation: key fallback.** `tools.web.search.apiKey`, else
   `providers.deepseek.apiKey` (environment applied), else
@@ -1461,7 +1461,7 @@ Phase 2 is complete; phase 3 is in progress.
   Capabilities page reloads the tool live). Keys stay on the Providers
   page.
 - **Deviation: saved in the workspace.** nanobot writes under its
-  runtime media directory; nanobot-go writes to
+  runtime media directory; wally writes to
   `<workspace>/media/<saveDir>/`, next to `media/telegram` and
   `media/weixin`, because the message tool only sends workspace files.
   Writes go through an `os.Root` on the workspace (mode 0600). Reference
@@ -1480,7 +1480,7 @@ Phase 2 is complete; phase 3 is in progress.
 
 ### Cron
 
-- **Own cron parser.** nanobot uses croniter; nanobot-go parses standard
+- **Own cron parser.** nanobot uses croniter; wally parses standard
   5-field expressions itself (std lib only): `*`, values, ranges, lists,
   steps, month/weekday names, `0`/`7` for Sunday, `@yearly`...`@hourly`,
   and Vixie's rule that when both day fields are restricted either may
@@ -1499,7 +1499,7 @@ Phase 2 is complete; phase 3 is in progress.
   nanobot's.
 - **No action log; a lock instead.** nanobot's live service owns the store
   and other processes append to `cron/action.jsonl`, merged on the next
-  load. nanobot-go has no owner: every change (from the gateway, `nanobot
+  load. wally has no owner: every change (from the gateway, `nanobot
   agent` or `nanobot cron`) re-reads `jobs.json`, edits it and replaces it
   atomically under an in-process mutex and an flock on `cron/.jobs.lock`
   (Unix; elsewhere only the mutex, so concurrent processes can lose an
@@ -1507,12 +1507,12 @@ Phase 2 is complete; phase 3 is in progress.
   wakes, within five minutes, as in nanobot. Nothing prevents two
   gateways on one workspace from both running the jobs.
 - **A corrupt store stops the gateway.** nanobot renames an unreadable
-  `jobs.json` to `.corrupt-<ts>` and refuses to start. nanobot-go leaves
+  `jobs.json` to `.corrupt-<ts>` and refuses to start. wally leaves
   it in place, refuses to start the gateway (and every other change),
   and asks for it to be fixed or removed. A newer `version` is refused too.
 - **Restarts keep the schedule.** nanobot recomputes every job's next run
   when the service starts, so an `every` job is pushed back by a restart
-  and a one-time job missed while it was down never runs. nanobot-go keeps
+  and a one-time job missed while it was down never runs. wally keeps
   next runs that are still ahead, recomputes those that passed (missed
   `every`/`cron` runs are skipped, as in nanobot), and runs a missed `at`
   job once at startup. Re-registering the Dream job with an unchanged
@@ -1525,7 +1525,7 @@ Phase 2 is complete; phase 3 is in progress.
 - **Unbound jobs are skipped when due**, recorded as `skipped`; nanobot
   also disables them when it loads the store. The tool cannot create one.
 - **No defer-until-idle coordinator.** nanobot holds a cron turn back while
-  its session is busy. nanobot-go submits it through
+  its session is busy. wally submits it through
   `Loop.ProcessMessage`, which already queues it behind the session's
   turns. The rendered reminder prompt is saved to the session as the
   user message (nanobot saves "Scheduled cron job triggered: ..."), and
@@ -1533,13 +1533,13 @@ Phase 2 is complete; phase 3 is in progress.
   exists, see "Message tool"). The trigger marker is `_cron_trigger` in the inbound
   metadata; the tool refuses `add` in such a turn, like nanobot.
 - **Turn context through `context.Context`.** nanobot's tool reads a
-  request-context variable; nanobot-go's Loop attaches `tools.Turn`
+  request-context variable; wally's Loop attaches `tools.Turn`
   (channel, chat, session key, metadata) to every turn's context. Dream's
   turns have none, and Dream's registry has no cron tool anyway. Binding
   metadata is copied through JSON, dropping values that do not encode.
 - **Default zone is the host's.** nanobot defaults naive `at` times and
   `cron_expr` without `tz` to `agents.defaults.timezone` (UTC unless
-  set). nanobot-go has no timezone setting yet: it uses the gateway
+  set). wally has no timezone setting yet: it uses the gateway
   host's local zone, stored as "no zone" so the job follows the host.
   Explicit `tz` values are stored as given; `"Local"` is rejected.
 - **`at` parsing.** Accepted forms follow Python's `fromisoformat`
@@ -1549,7 +1549,7 @@ Phase 2 is complete; phase 3 is in progress.
   `dream.cron` uses the host's zone. `modelOverride` is not ported.
 - **`nanobot agent` stores jobs, with a note.** As in nanobot, the tool is
   available outside the gateway and jobs land in the store for the
-  gateway to run; nanobot-go adds a note to the result saying so. A job
+  gateway to run; wally adds a note to the result saying so. A job
   made in the CLI session is bound to channel `cli`, which the gateway
   does not run: the turn still runs in `cli:direct` and its reply is
   dropped with a warning.
@@ -1565,13 +1565,13 @@ Phase 2 is complete; phase 3 is in progress.
   fail-closed `evaluate_notification` check before the reply is sent and
   recorded in the chat's session. Differences:
   - The target picker sees only `channel:chat` keys of running channels.
-    nanobot-go has no unified session and no WebUI sidebar archive, so
+    wally has no unified session and no WebUI sidebar archive, so
     there is no `unified_session` route and no archived-key filter. Keys
     with more parts (Telegram forum topics, `telegram:<chat>:topic:<n>`)
     are skipped, since the chat id alone would post outside the topic.
   - The message tool acknowledges sends from the `heartbeat` session
     without publishing them (nanobot's `set_suppress_delivery`), so the
-    reply is the only output and goes through the check. nanobot-go keys
+    reply is the only output and goes through the check. wally keys
     this on the session (`heartbeat.SessionKey` in `tools.Turn`) rather
     than a flag set around the run. Tool progress is not streamed
     anywhere.
@@ -1593,7 +1593,7 @@ Phase 2 is complete; phase 3 is in progress.
 ### Exec sandbox
 
 - **Fails closed everywhere.** nanobot logs a warning on Windows and runs
-  the command unsandboxed. nanobot-go checks the backend when the exec
+  the command unsandboxed. wally checks the backend when the exec
   tool is built: an unknown name (already a config error), a backend for
   another OS (bwrap off Linux, Seatbelt off macOS, either on Windows), a
   missing binary, or a probe run that fails (e.g. bwrap without
@@ -1605,7 +1605,7 @@ Phase 2 is complete; phase 3 is in progress.
   checks the name, so a config for another machine still parses; the
   host check happens when the exec tool is built, and `status` reports it.
 - **Bind paths must be absolute.** nanobot silently skips relative
-  entries; nanobot-go rejects them (after `~` and `$VAR` expansion) when
+  entries; wally rejects them (after `~` and `$VAR` expansion) when
   the config loads. Paths equal to or containing the workspace are
   ignored in both, also when they only match by file identity (e.g. a
   differently-cased path on a case-insensitive volume).
@@ -1616,7 +1616,7 @@ Phase 2 is complete; phase 3 is in progress.
   then runs that absolute path; Seatbelt always uses
   `/usr/bin/sandbox-exec` as in nanobot.
 - **`TMPDIR=/tmp` under bwrap.** nanobot leaves the host `TMPDIR`, which
-  usually does not exist inside the sandbox; nanobot-go points it at the
+  usually does not exist inside the sandbox; wally points it at the
   sandbox's private `/tmp`. Seatbelt sets `HOME` and `TMPDIR` to the
   workspace, as in nanobot.
 
@@ -1633,7 +1633,7 @@ Phase 2 is complete; phase 3 is in progress.
   `net.Dialer.Control` check on the dialled address stays as defense in
   depth.
 - **No global whitelist.** nanobot's `configure_ssrf_whitelist` sets
-  module state at config load; nanobot-go passes a `*security.Policy` to
+  module state at config load; wally passes a `*security.Policy` to
   the tools that need it. The gateway builds one and shares it, so
   `Policy.SetWhitelist` (from the WebUI settings) changes it for all of
   them at once; dials and checks read it under a lock.
@@ -1646,10 +1646,10 @@ Phase 2 is complete; phase 3 is in progress.
   list does not. The benchmarking range `198.18.0.0/15` remains allowed for
   Clash/Surge fake-IP DNS through a system proxy or TUN.
 - **Redirects fail closed.** nanobot's `validate_resolved_url` lets a
-  redirect through when its host does not resolve; nanobot-go refuses
+  redirect through when its host does not resolve; wally refuses
   it (the dial would fail anyway, but the error is clearer).
 - **`trust_remote_dns` is not ported.** nanobot uses it only for image
-  generation behind a trusted proxy that resolves names itself. nanobot-go
+  generation behind a trusted proxy that resolves names itself. wally
   has no such caller, and a direct pinned dial cannot connect to a name
   it could not resolve, so there is no `ssrfTrustRemoteDNS` setting.
 - **`allow_loopback` is not ported.** It has no caller here; whitelist
@@ -1678,18 +1678,18 @@ Phase 2 is complete; phase 3 is in progress.
   other Content-Type than JSON too, and the body cap is 4 MiB instead of
   20 MiB. Remote image URLs are a 400 in both.
 - **Streaming sends the whole reply as one chunk.** nanobot forwards
-  token deltas as the model produces them. nanobot-go's providers do not
+  token deltas as the model produces them. wally's providers do not
   stream, so the reply is one `chat.completion.chunk` (with
   `role: "assistant"`) when the turn is done, followed by the stop chunk
   and `[DONE]`; `: keep-alive` SSE comments every 15 seconds keep proxies
   from giving up meanwhile. As in nanobot, headers go out at once and a
   failure ends the stream without the stop chunk and `[DONE]`.
 - **The timeout includes the session wait.** nanobot starts
-  `api.timeout` after taking the session lock. nanobot-go submits the turn
+  `api.timeout` after taking the session lock. wally submits the turn
   to the loop's per-session queue under the request's deadline, so time
   spent behind earlier turns of the same session counts.
 - **Disconnecting cancels the turn.** nanobot only cancels a streaming
-  turn when a write fails; a non-streaming one runs on. nanobot-go runs
+  turn when a write fails; a non-streaming one runs on. wally runs
   every turn under the request's context, so a client that goes away
   cancels it in both modes (a canceled turn is not saved). A turn
   canceled by shutdown answers 503 (new). 504 uses type `server_error`
@@ -1701,7 +1701,7 @@ Phase 2 is complete; phase 3 is in progress.
   requests get `gateway.shutdownTimeout` on shutdown like the channels'
   turns (`serve` uses the same setting).
 - **Remote hosts are checked at startup only.** nanobot also fails config
-  validation for `0.0.0.0`/`::` without `api.apiKey`; nanobot-go checks
+  validation for `0.0.0.0`/`::` without `api.apiKey`; wally checks
   any non-loopback host when the API starts, so `nanobot agent` still runs
   with such a config.
 - **Small additions.** Unknown routes and wrong methods answer 404/405 in
@@ -1720,13 +1720,13 @@ Phase 2 is complete; phase 3 is in progress.
 
 - **Same address as the gateway.** nanobot's WebSocket channel runs its
   own server on port 8765 (`channels.websocket.host`/`port`) and serves
-  the WebUI there; the gateway's 18790 is health only. nanobot-go mounts
+  the WebUI there; the gateway's 18790 is health only. wally mounts
   `/ws` and the page on the gateway's server through `channels.Mounter`
   (one listener, one `--host`/`--port`); the section has no `host`,
   `port` or `path` keys and rejects them.
 - **Loopback only, no auth.** nanobot allows a non-loopback `host` when
   `token` or `tokenIssueSecret` is set and lets same-machine clients in
-  without one. nanobot-go has no tokens yet, so an enabled channel on a
+  without one. wally has no tokens yet, so an enabled channel on a
   non-loopback gateway fails the startup. It also rejects requests whose
   `Host` header is not a loopback name (DNS rebinding) and upgrades whose
   `Origin` names another host (cross-site WebSocket hijacking); nanobot's
@@ -1743,7 +1743,7 @@ Phase 2 is complete; phase 3 is in progress.
   sends `ProgressEvent`s (content plus `tool_hint`), tool-event payloads
   with arguments and results, reasoning bubbles and streamed deltas, and
   formats all calls of an iteration as one hint (`read a × 2, $ ls`).
-  nanobot-go publishes one plain hint per call as it starts (from
+  wally publishes one plain hint per call as it starts (from
   `OnToolStart`, so parallel read-only calls each send one), nothing on
   tool end, no reasoning; assistant text, between tool calls too, comes
   only as `delta` frames. The hint covers nanobot's common formats (`read`,
@@ -1755,18 +1755,18 @@ Phase 2 is complete; phase 3 is in progress.
   it, and only bus-driven turns publish it (API and cron turns, which
   deliver their own replies, do not).
 - **Stop.** nanobot's `/stop` cancels the session's active tasks and
-  subagents and reports how many it stopped. nanobot-go cancels the one
+  subagents and reports how many it stopped. wally cancels the one
   turn in flight (Serve handles `/stop` before queuing it), answers it
   "Stopped.", and lets queued messages run; with nothing in flight the
   reply is "Nothing to stop.". Through `Loop.Process` (API) `/stop`
   waits behind the session's turn, so it does not stop it there.
 - **Chat ids.** nanobot clients pick topics and attach to chats by id;
-  nanobot-go gives each connection a random id (`crypto/rand.Text`) or
+  wally gives each connection a random id (`crypto/rand.Text`) or
   the `?chat_id=` it asks for, and the page stores it in
   `localStorage`.
 - **Chat list over HTTP, not the socket.** nanobot's WebUI reads
   `GET /api/sessions` (every channel's sessions, with previews) and
-  lists them in its ChatList. nanobot-go's channel serves
+  lists them in its ChatList. wally's channel serves
   `GET /ui/chats` next to the page instead of adding a WebSocket frame
   pair: it needs no open socket, and no other channel sees a new frame
   type. It lists only `websocket:*` sessions (at most 50), loads each
@@ -1774,7 +1774,7 @@ Phase 2 is complete; phase 3 is in progress.
   chats with no user or assistant text yet.
 - **Rename and delete over HTTP, through the Manager.** nanobot renames
   through its session metadata (`title`, `title_user_edited`) and
-  deletes with a `session.delete` mutation. nanobot-go keeps the same
+  deletes with a `session.delete` mutation. wally keeps the same
   metadata keys but serves `PATCH` and `DELETE /ui/chats/{chat_id}` next
   to the list, taking only chat ids (so only `websocket:*` keys) and
   refusing cross-origin requests (`http.CrossOriginProtection`) besides
@@ -1791,7 +1791,7 @@ Phase 2 is complete; phase 3 is in progress.
   is not detected.
 - **Status and a settings whitelist.** nanobot's WebUI settings read
   and write the whole config (models, providers and their keys,
-  channels, MCP, OAuth) and can restart the gateway. nanobot-go serves a
+  channels, MCP, OAuth) and can restart the gateway. wally serves a
   read-only overview at `GET /ui/status`, with the intent of
   `nanobot status`: names and
   flags, never key material, tokens, allow lists, environment values or
@@ -1816,7 +1816,7 @@ Phase 2 is complete; phase 3 is in progress.
   token, and so is another OS's sandbox, either of which would stop the
   gateway from starting.
 - **History is pushed, not fetched.** nanobot's WebUI reads a chat's
-  messages from the saved session. nanobot-go pushes them as one
+  messages from the saved session. wally pushes them as one
   `history` frame after every `hello` and the page replaces its list, so
   a reply that raced the reconnect is not shown twice (in a narrow race
   it can still appear twice until the next reload). The frame carries the
@@ -1831,7 +1831,7 @@ Phase 2 is complete; phase 3 is in progress.
 - **Media from the workspace, not a signed media store.** nanobot copies
   files into a media directory and hands the page HMAC-signed
   `/api/media/<sig>/<payload>` URLs, so a URL alone grants access.
-  nanobot-go serves workspace-relative paths at `/ui/media/` behind the
+  wally serves workspace-relative paths at `/ui/media/` behind the
   same sign-in as the rest of the WebUI (the cookie rides along with
   `<img>`), with no copies and no signatures; any signed-in browser can
   fetch any non-hidden workspace file. Uploads land in the workspace
@@ -1855,6 +1855,6 @@ Phase 2 is complete; phase 3 is in progress.
   it. The build has no inline scripts or styles and is served with the
   same strict CSP (`default-src 'self'`, plus `img-src 'self'`). The gateway never proxies a
   Vite dev server (`npm run dev` proxies to the gateway instead, at
-  `$NANOBOT_GO_GATEWAY_URL` or 127.0.0.1:18790). `nanobot webui` is a
+  `$WALLY_GATEWAY_URL` or 127.0.0.1:18790). `nanobot webui` is a
   thin launcher over `nanobot gateway`, owning the gateway child it
   starts rather than a shared background instance.

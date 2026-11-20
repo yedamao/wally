@@ -20,7 +20,7 @@ cron(action="add", message="Time to take a break!", every_seconds=1200)
 
 Task the agent runs each time:
 ```
-cron(action="add", message="Check the GitHub stars of yedamao/nanobot-go and report", every_seconds=3600)
+cron(action="add", message="Check the GitHub stars of yedamao/wally and report", every_seconds=3600)
 ```
 
 One-time (compute the ISO datetime from the current time):
