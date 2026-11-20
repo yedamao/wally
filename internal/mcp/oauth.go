@@ -38,7 +38,7 @@ const maxOAuthMetadata = 1 << 20
 const (
 	oauthClientName = "wally"
 	oauthClientURI  = "https://github.com/yedamao/wally"
-	oauthLogoURI    = "https://raw.githubusercontent.com/yedamao/nanobot-go/main/webui/public/icon-192.png"
+	oauthLogoURI    = "https://raw.githubusercontent.com/yedamao/wally/main/webui/public/icon-192.png"
 )
 
 // OAuthBrowser is given only to a user-started authorization attempt

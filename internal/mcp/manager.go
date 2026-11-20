@@ -209,7 +209,7 @@ func NewManager(servers map[string]config.MCPServerConfig, reg *tools.Registry, 
 		m.newTransport = NewTransportFactory(m.ssrf)
 	}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
-	// Advertise no client capabilities: nanobot-go serves no roots,
+	// Advertise no client capabilities: Wally serves no roots,
 	// sampling or elicitation.
 	m.client = sdk.NewClient(&sdk.Implementation{Name: "wally", Version: m.version},
 		&sdk.ClientOptions{Logger: logger, Capabilities: &sdk.ClientCapabilities{}})

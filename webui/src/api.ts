@@ -587,7 +587,7 @@ export interface Provider {
   apiBase: string;
   defaultApiBase?: string;
   restart_required: boolean;
-  /** "apiKey" and/or "apiBase" when NANOBOT_GO_<NAME>_API_KEY/_API_BASE win over the file. */
+  /** "apiKey" and/or "apiBase" when WALLY_<NAME>_API_KEY/_API_BASE win over the file. */
   env_overrides: string[];
 }
 
@@ -724,7 +724,7 @@ export interface ChannelConfig {
   /** WeChat: the saved login, without its secrets. */
   login?: WeixinLogin;
   defaultBase: string;
-  /** "token" when NANOBOT_GO_<CHANNEL>_TOKEN wins over the file. */
+  /** "token" when WALLY_<CHANNEL>_TOKEN wins over the file. */
   env_overrides: string[];
   restart_required: boolean;
   running: boolean;

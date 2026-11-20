@@ -82,7 +82,7 @@ func TestGatewayRunsTelegramWithPairing(t *testing.T) {
 		delete(c.Channels, "fake")
 		c.Channels["telegram"] = json.RawMessage(`{"enabled": true, "allowFrom": ["42"], "pollTimeout": 1, "apiBase": "` + api.srv.URL + `"}`)
 	})
-	e.env["NANOBOT_GO_TELEGRAM_TOKEN"] = fakeBotToken
+	e.env["WALLY_TELEGRAM_TOKEN"] = fakeBotToken
 	g := startGateway(t, e, nil)
 	if !strings.Contains(e.stdout.String(), "Channels: telegram") {
 		t.Errorf("banner = %q", e.stdout)

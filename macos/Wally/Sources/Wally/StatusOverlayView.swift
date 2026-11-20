@@ -123,7 +123,7 @@ final class StatusOverlayView: NSView {
 
     @objc private func openConfig() {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        NSWorkspace.shared.open(home.appendingPathComponent(".nanobot-go"))
+        NSWorkspace.shared.open(home.appendingPathComponent(".wally"))
     }
 }
 

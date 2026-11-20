@@ -191,7 +191,7 @@ func (s *webChannels) TestChannelConfig(ctx context.Context, name string, t webs
 	getenv := s.getenv
 	if draft != "" {
 		getenv = func(k string) string {
-			if k == telegram.EnvToken {
+			if telegram.IsTokenEnv(k) {
 				return draft
 			}
 			return s.getenv(k)
@@ -201,7 +201,7 @@ func (s *webChannels) TestChannelConfig(ctx context.Context, name string, t webs
 		Token string `json:"token"`
 	}
 	json.Unmarshal(raw, &head)
-	if strings.TrimSpace(getenv(telegram.EnvToken)) == "" && strings.TrimSpace(head.Token) == "" {
+	if strings.TrimSpace(telegram.TokenFromEnv(getenv)) == "" && strings.TrimSpace(head.Token) == "" {
 		return websocket.ChannelTestResult{Status: websocket.ChannelTestNotConfigured, Message: "No bot token to test."}, nil
 	}
 	cfg, err := telegram.ParseConfig(raw, getenv)
@@ -385,7 +385,7 @@ func checkChannelToken(name, raw string) (string, error) {
 	}
 	if name == telegram.Name {
 		if _, err := telegram.ParseConfig(json.RawMessage(`{}`), func(k2 string) string {
-			if k2 == telegram.EnvToken {
+			if telegram.IsTokenEnv(k2) {
 				return k
 			}
 			return ""
@@ -430,9 +430,9 @@ func (s *webChannels) check(name string, raw json.RawMessage) error {
 		}
 		json.Unmarshal(raw, &head)
 		getenv := s.getenv
-		if !head.Enabled && strings.TrimSpace(head.Token) == "" && s.getenv(telegram.EnvToken) == "" {
+		if !head.Enabled && strings.TrimSpace(head.Token) == "" && telegram.TokenFromEnv(s.getenv) == "" {
 			getenv = func(k string) string {
-				if k == telegram.EnvToken {
+				if telegram.IsTokenEnv(k) {
 					return placeholderTelegramToken
 				}
 				return s.getenv(k)
@@ -488,7 +488,7 @@ func (s *webChannels) view(name string, raw json.RawMessage, present bool) webso
 	v.PollTimeout = sec.PollTimeout
 	switch {
 	case name == telegram.Name:
-		if s.getenv(telegram.EnvToken) != "" {
+		if telegram.TokenFromEnv(s.getenv) != "" {
 			v.EnvOverrides = append(v.EnvOverrides, "token")
 		}
 		v.APIBase = sec.APIBase
@@ -499,7 +499,7 @@ func (s *webChannels) view(name string, raw json.RawMessage, present bool) webso
 		v.DefaultBase = telegram.DefaultAPIBase
 		v.TestSupported = true
 	case weixin.IsName(name):
-		if s.getenv(weixin.EnvToken) != "" {
+		if weixin.TokenFromEnv(s.getenv) != "" {
 			v.EnvOverrides = append(v.EnvOverrides, "token")
 		}
 		v.BaseURL = sec.BaseURL

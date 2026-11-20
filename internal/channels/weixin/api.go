@@ -84,7 +84,7 @@ func newClient(hc *http.Client, routeTag, version string) *client {
 		version = "dev"
 	}
 	return &client{http: hc, routeTag: routeTag,
-		info: baseInfo{ChannelVersion: channelVersion, BotAgent: "nanobot-go/" + version + " (go)"}}
+		info: baseInfo{ChannelVersion: channelVersion, BotAgent: "wally/" + version + " (go)"}}
 }
 
 // apiError is a response with a non-zero ret or errcode.

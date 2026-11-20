@@ -11,7 +11,7 @@ import (
 // openRouterHeaders are OpenRouter's app attribution headers.
 var openRouterHeaders = map[string]string{
 	"HTTP-Referer":       "https://github.com/yedamao/wally",
-	"X-OpenRouter-Title": "nanobot-go",
+	"X-OpenRouter-Title": "Wally",
 }
 
 // OpenRouter generates images through OpenRouter's chat completions with

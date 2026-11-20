@@ -178,7 +178,7 @@ func (c *Channel) mcpOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		mcpOAuthPage(w, status, false, msg)
 		return
 	}
-	mcpOAuthPage(w, http.StatusOK, true, "Authorization received for "+name+". Return to nanobot-go to finish connecting.")
+	mcpOAuthPage(w, http.StatusOK, true, "Authorization received for "+name+". Return to Wally to finish connecting.")
 }
 
 func mcpOAuthPage(w http.ResponseWriter, status int, ok bool, message string) {

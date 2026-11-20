@@ -201,8 +201,8 @@ func TestStatusNeverPrintsKeys(t *testing.T) {
 	if err := cfg.Save(e.configPath); err != nil {
 		t.Fatal(err)
 	}
-	e.env["NANOBOT_GO_OPENAI_API_KEY"] = "sk-openai-secret-env"
-	e.env["NANOBOT_GO_API_KEY"] = "api-secret-env"
+	e.env["WALLY_OPENAI_API_KEY"] = "sk-openai-secret-env"
+	e.env["WALLY_API_KEY"] = "api-secret-env"
 	if code := e.run(t, nil, "status"); code != 0 {
 		t.Fatalf("status exit = %d, stderr %s", code, e.stderr)
 	}
@@ -224,7 +224,7 @@ func TestStatusNeverPrintsKeys(t *testing.T) {
 	}
 
 	// The Telegram token from the environment wins and is not printed.
-	e.env["NANOBOT_GO_TELEGRAM_TOKEN"] = "456:secret-env-token"
+	e.env["WALLY_TELEGRAM_TOKEN"] = "456:secret-env-token"
 	if code := e.run(t, nil, "status"); code != 0 {
 		t.Fatalf("status exit = %d, stderr %s", code, e.stderr)
 	}

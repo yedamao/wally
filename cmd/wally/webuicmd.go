@@ -37,9 +37,11 @@ const (
 	// defaultViteAddr is where `webui --dev` runs Vite.
 	defaultViteAddr = "127.0.0.1:5173"
 	// envWebUIDir points `webui --dev` at the webui/ source directory.
-	envWebUIDir = "NANOBOT_GO_WEBUI_DIR"
+	envWebUIDir = "WALLY_WEBUI_DIR"
+	// legacyEnvWebUIDir is accepted for one release when envWebUIDir is unset.
+	legacyEnvWebUIDir = "NANOBOT_GO_WEBUI_DIR"
 	// envGatewayURL tells webui/vite.config.ts where to proxy.
-	envGatewayURL = "NANOBOT_GO_GATEWAY_URL"
+	envGatewayURL = "WALLY_GATEWAY_URL"
 )
 
 // webui prepares the local WebUI (enabling the websocket channel in the
@@ -62,7 +64,7 @@ func (a *app) webui(ctx context.Context, args []string) error {
 	host := fs.String("host", "", "gateway host to listen on (sets gateway.host; beyond loopback, browsers must sign in)")
 	port := fs.Int("port", 0, "gateway port, where the WebUI is served (sets gateway.port; default from the config)")
 	fs.IntVar(port, "p", 0, "shorthand for --port")
-	gatewayPort := fs.Int("gateway-port", 0, "same as --port: nanobot-go serves the WebUI on the gateway port")
+	gatewayPort := fs.Int("gateway-port", 0, "same as --port: Wally serves the WebUI on the gateway port")
 	dev := fs.Bool("dev", false, "also run the Vite dev server from webui/ with live frontend updates")
 	noOpen := fs.Bool("no-open", false, "do not open a browser")
 	yes := fs.Bool("yes", false, "apply safe local WebUI defaults without prompting")
@@ -150,7 +152,7 @@ func (a *app) webui(ctx context.Context, args []string) error {
 	var started bool
 	switch {
 	case healthyUI && !managed:
-		// Attach: an unmanaged gateway (older nanobot-go, or another
+		// Attach: an unmanaged gateway (older Wally, or another
 		// config on this port) that this command never stops.
 	case !healthyUI && gatewayHealthy(ctx, client, base) && !managed:
 		// A health-only unmanaged process cannot pick up channels.websocket
@@ -287,7 +289,7 @@ func backgroundDeprecated(path, workspace string) error {
 // result is 0 when neither is set.
 func webuiPort(port, gatewayPort int) (int, error) {
 	if port != 0 && gatewayPort != 0 && port != gatewayPort {
-		return 0, fmt.Errorf("--port %d and --gateway-port %d differ: nanobot-go serves the WebUI on the gateway port, so there is no separate WebUI port; pass one of them", port, gatewayPort)
+		return 0, fmt.Errorf("--port %d and --gateway-port %d differ: Wally serves the WebUI on the gateway port, so there is no separate WebUI port; pass one of them", port, gatewayPort)
 	}
 	if port == 0 {
 		port = gatewayPort
@@ -540,12 +542,20 @@ func (a *app) startVite(ctx context.Context, client *http.Client, viteAddr, base
 }
 
 // webuiSourceDir finds the webui/ source directory for --dev:
-// $NANOBOT_GO_WEBUI_DIR, else the checkout around the working directory
-// or the binary (bin/nanobot).
+// $WALLY_WEBUI_DIR (or legacy $NANOBOT_GO_WEBUI_DIR), else the checkout
+// around the working directory or the binary (bin/wally).
 func (a *app) webuiSourceDir() (string, error) {
-	if d := a.getenv(envWebUIDir); d != "" {
+	d := a.getenv(envWebUIDir)
+	if d == "" {
+		d = a.getenv(legacyEnvWebUIDir)
+	}
+	if d != "" {
+		name := envWebUIDir
+		if a.getenv(envWebUIDir) == "" {
+			name = legacyEnvWebUIDir
+		}
 		if _, err := os.Stat(filepath.Join(d, "package.json")); err != nil {
-			return "", fmt.Errorf("--dev: %s=%s has no package.json", envWebUIDir, d)
+			return "", fmt.Errorf("--dev: %s=%s has no package.json", name, d)
 		}
 		return filepath.Abs(d)
 	}
@@ -568,7 +578,7 @@ func (a *app) webuiSourceDir() (string, error) {
 			d = parent
 		}
 	}
-	return "", fmt.Errorf("--dev needs the nanobot-go source checkout: run it inside the repository or set %s to its webui/ directory", envWebUIDir)
+	return "", fmt.Errorf("--dev needs the Wally source checkout: run it inside the repository or set %s to its webui/ directory", envWebUIDir)
 }
 
 func (a *app) printWebUIReady(openURL, base, path string, dev, started bool) {

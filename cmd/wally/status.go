@@ -146,7 +146,7 @@ func channelSummary(sections map[string]json.RawMessage, getenv func(string) str
 			state = "enabled"
 		}
 		if name == telegram.Name && state != "invalid" {
-			state += ", token " + keySource(head.Token != "", getenv(telegram.EnvToken) != "")
+			state += ", token " + keySource(head.Token != "", telegram.TokenFromEnv(getenv) != "")
 		}
 		if weixin.IsName(name) && state != "invalid" {
 			state += ", " + weixinLogin(name, sections[name], getenv, configPath)
@@ -164,8 +164,8 @@ func weixinLogin(name string, raw json.RawMessage, getenv func(string) string, c
 		Token string `json:"token"`
 	}
 	json.Unmarshal(raw, &head)
-	if getenv(weixin.EnvToken) != "" || strings.TrimSpace(head.Token) != "" {
-		return "token " + keySource(head.Token != "", getenv(weixin.EnvToken) != "")
+	if weixin.TokenFromEnv(getenv) != "" || strings.TrimSpace(head.Token) != "" {
+		return "token " + keySource(head.Token != "", weixin.TokenFromEnv(getenv) != "")
 	}
 	cfg, err := weixin.ParseConfig(raw, nil)
 	if err != nil {

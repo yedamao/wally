@@ -96,7 +96,7 @@ func writeTelegramConfig(t *testing.T, apiBase string) string {
 
 func TestWebChannelsListRedacts(t *testing.T) {
 	path := writeSettingsConfig(t)
-	s := runningChannels(t, path, map[string]string{"NANOBOT_GO_WEIXIN_TOKEN": envSecret}, "websocket")
+	s := runningChannels(t, path, map[string]string{"WALLY_WEIXIN_TOKEN": envSecret}, "websocket")
 	list, err := s.ChannelConfigs()
 	if err != nil {
 		t.Fatal(err)
@@ -408,7 +408,7 @@ func TestWebChannelsTelegramToken(t *testing.T) {
 	}
 
 	// With the token in the environment, enabling needs none in the file.
-	env := map[string]string{"NANOBOT_GO_TELEGRAM_TOKEN": tgOtherToken}
+	env := map[string]string{"WALLY_TELEGRAM_TOKEN": tgOtherToken}
 	s = runningChannels(t, path, env)
 	v, err = s.UpdateChannelConfig("telegram", websocket.ChannelConfigPatch{Enabled: ptr(true)})
 	if err != nil {

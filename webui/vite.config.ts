@@ -7,10 +7,13 @@ import react from "@vitejs/plugin-react";
 //
 // `npm run dev` serves the app on http://localhost:5173/ui/ and proxies
 // the gateway's endpoints to a gateway running on 127.0.0.1:18790, or on
-// $NANOBOT_GO_GATEWAY_URL (which `nanobot webui --dev` sets). The Host
+// $WALLY_GATEWAY_URL (which `wally webui --dev` sets). The Host
 // header stays localhost, so the gateway's loopback and same-origin
 // checks pass.
-const gateway = process.env.NANOBOT_GO_GATEWAY_URL || "http://127.0.0.1:18790";
+const gateway =
+  process.env.WALLY_GATEWAY_URL ||
+  process.env.NANOBOT_GO_GATEWAY_URL ||
+  "http://127.0.0.1:18790";
 
 export default defineConfig({
   base: "/ui/",

@@ -89,7 +89,7 @@ func TestPollingAdvancesAndSavesTheCursor(t *testing.T) {
 		t.Errorf("X-WECHAT-UIN = %q", c.Header.Get("X-WECHAT-UIN"))
 	}
 	bi, _ := c.Body["base_info"].(map[string]any)
-	if bi["channel_version"] != "2.4.6" || !strings.HasPrefix(bi["bot_agent"].(string), "nanobot-go/test") {
+	if bi["channel_version"] != "2.4.6" || !strings.HasPrefix(bi["bot_agent"].(string), "wally/test") {
 		t.Errorf("base_info = %v", bi)
 	}
 

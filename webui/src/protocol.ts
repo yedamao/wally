@@ -62,7 +62,7 @@ export function parseFrame(data: unknown): ServerFrame | null {
 
 // CHAT_KEY is the localStorage key of the current chat id; the plain page
 // used the same key, so an open chat survives the upgrade.
-export const CHAT_KEY = "nanobot-go.chatId";
+export const CHAT_KEY = "wally.chatId";
 
 export function storedChatId(): string | null {
   return localStorage.getItem(CHAT_KEY);

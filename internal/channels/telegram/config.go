@@ -18,7 +18,9 @@ const (
 	// session key prefix.
 	Name = "telegram"
 	// EnvToken overrides channels.telegram.token.
-	EnvToken = "NANOBOT_GO_TELEGRAM_TOKEN"
+	EnvToken = "WALLY_TELEGRAM_TOKEN"
+	// LegacyEnvToken is accepted for one release when EnvToken is unset.
+	LegacyEnvToken = "NANOBOT_GO_TELEGRAM_TOKEN"
 	// DefaultAPIBase is the Bot API server.
 	DefaultAPIBase = "https://api.telegram.org"
 	// DefaultPollTimeout is the getUpdates long-poll timeout in seconds.
@@ -35,8 +37,8 @@ var tokenRE = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]+$`)
 // Config is the channels.telegram section.
 type Config struct {
 	Enabled bool `json:"enabled"`
-	// Token is the bot token from @BotFather; NANOBOT_GO_TELEGRAM_TOKEN
-	// overrides it.
+	// Token is the bot token from @BotFather; WALLY_TELEGRAM_TOKEN
+	// (or legacy NANOBOT_GO_TELEGRAM_TOKEN) overrides it.
 	Token string `json:"token"`
 	// AllowFrom lists the senders allowed to talk to the bot: numeric
 	// user IDs and/or usernames, or "*" for everyone. Empty allows only
@@ -89,6 +91,24 @@ func (l *allowList) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// TokenFromEnv returns WALLY_TELEGRAM_TOKEN, or legacy NANOBOT_GO_TELEGRAM_TOKEN
+// when the current name is unset. getenv may be nil.
+func TokenFromEnv(getenv func(string) string) string {
+	if getenv == nil {
+		return ""
+	}
+	if v := getenv(EnvToken); v != "" {
+		return v
+	}
+	return getenv(LegacyEnvToken)
+}
+
+// IsTokenEnv reports whether k is the current or legacy Telegram token
+// environment variable name.
+func IsTokenEnv(k string) bool {
+	return k == EnvToken || k == LegacyEnvToken
+}
+
 // ParseConfig decodes a channels.telegram section, applies the token's
 // environment override (getenv may be nil) and the defaults, and
 // validates it. Errors never contain the token.
@@ -97,10 +117,8 @@ func ParseConfig(raw json.RawMessage, getenv func(string) string) (Config, error
 	if err := channels.DecodeConfig(raw, &cfg); err != nil {
 		return Config{}, err
 	}
-	if getenv != nil {
-		if v := getenv(EnvToken); v != "" {
-			cfg.Token = v
-		}
+	if v := TokenFromEnv(getenv); v != "" {
+		cfg.Token = v
 	}
 	cfg.Token = strings.TrimSpace(cfg.Token)
 	if cfg.APIBase == "" {

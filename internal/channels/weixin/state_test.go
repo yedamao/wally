@@ -117,10 +117,10 @@ func TestParseConfig(t *testing.T) {
 	if got := cfg.StatePath("/x/state/weixin"); got != "/x/state/weixin/account.json" {
 		t.Errorf("StatePath = %q", got)
 	}
-	if got := DefaultStateDir("/home/u/.nanobot-go/config.json"); got != "/home/u/.nanobot-go/state/weixin" {
+	if got := DefaultStateDir("/home/u/.wally/config.json"); got != "/home/u/.wally/state/weixin" {
 		t.Errorf("DefaultStateDir = %q", got)
 	}
-	if got := DefaultStateDir("/home/u/.nanobot-go/config.json", "weixin.work"); got != "/home/u/.nanobot-go/state/weixin.work" {
+	if got := DefaultStateDir("/home/u/.wally/config.json", "weixin.work"); got != "/home/u/.wally/state/weixin.work" {
 		t.Errorf("DefaultStateDir(named) = %q", got)
 	}
 
