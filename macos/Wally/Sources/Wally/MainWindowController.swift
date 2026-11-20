@@ -19,14 +19,18 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         self.gateway = gateway
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 840),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Wally"
         window.minSize = NSSize(width: 960, height: 640)
         window.center()
-        window.titlebarAppearsTransparent = true
+        // Keep a real title bar so the window can be click-dragged. A
+        // fullSizeContentView + WKWebView under a transparent title bar
+        // steals mouse events and blocks dragging.
+        window.titlebarAppearsTransparent = false
+        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
