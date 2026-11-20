@@ -2,9 +2,12 @@
 /nanobot
 /bin/
 /dist/
+/macos/dist/
 *.exe
 *.test
 *.out
+# SwiftPM
+/macos/Wally/.build/
 
 # Coverage
 coverage.*
