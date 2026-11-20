@@ -26,6 +26,9 @@ need "$MACOS/Wally/Sources/Wally/ThemeBridge.swift"
 need "$MACOS/Wally/Sources/Wally/StatusOverlayView.swift"
 need "$MACOS/Wally/Sources/Wally/Info.plist"
 need "$MACOS/Wally/Sources/Wally/Resources/AppIcon.svg"
+need "$MACOS/Wally/Sources/Wally/Resources/AppIcon.icns"
+need "$MACOS/Wally/Sources/Wally/Resources/AppIcon.png"
+need "$MACOS/scripts/generate-app-icon.py"
 need "$MACOS/Wally/Tests/WallyTests/GatewayConfigTests.swift"
 
 # Must be AppKit (Command Line Tools lack SwiftUIMacros).
@@ -34,12 +37,17 @@ if grep -R -n --include='*.swift' -E 'import SwiftUI|@State |@StateObject|@Envir
   fail=1
 fi
 
-for key in CFBundleIdentifier CFBundleExecutable LSMinimumSystemVersion NSAppTransportSecurity; do
+for key in CFBundleIdentifier CFBundleExecutable CFBundleIconFile LSMinimumSystemVersion NSAppTransportSecurity; do
   if ! grep -q "$key" "$MACOS/Wally/Sources/Wally/Info.plist"; then
     echo "Info.plist missing key: $key" >&2
     fail=1
   fi
 done
+
+if ! grep -q '<string>AppIcon</string>' "$MACOS/Wally/Sources/Wally/Info.plist"; then
+  echo "Info.plist CFBundleIconFile should be AppIcon" >&2
+  fail=1
+fi
 
 if ! grep -q 'ai.wally.app' "$MACOS/Wally/Sources/Wally/Info.plist"; then
   echo "Info.plist bundle id should be ai.wally.app" >&2

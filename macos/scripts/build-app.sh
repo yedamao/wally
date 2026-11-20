@@ -81,15 +81,46 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Wally"
 chmod +x "$APP/Contents/MacOS/Wally"
 cp "$APP_SRC/Sources/Wally/Info.plist" "$APP/Contents/Info.plist"
-ICON_SVG="$APP_SRC/Sources/Wally/Resources/AppIcon.svg"
+
+# Dock / Finder icon (CFBundleIconFile = AppIcon → AppIcon.icns).
+ICON_DIR="$APP_SRC/Sources/Wally/Resources"
+ICON_ICNS="$ICON_DIR/AppIcon.icns"
+ICON_PNG="$ICON_DIR/AppIcon.png"
+ICON_SVG="$ICON_DIR/AppIcon.svg"
+if [[ -f "$ICON_ICNS" ]]; then
+  cp "$ICON_ICNS" "$APP/Contents/Resources/AppIcon.icns"
+elif [[ -f "$ICON_SVG" ]] && command -v iconutil >/dev/null && command -v sips >/dev/null; then
+  echo "==> Generating AppIcon.icns from SVG"
+  ICONSET="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$ICONSET"
+  MASTER="$(mktemp).png"
+  # Prefer rsvg-convert; fall back to qlmanage is unreliable — require a PNG master.
+  if command -v rsvg-convert >/dev/null; then
+    rsvg-convert -w 1024 -h 1024 "$ICON_SVG" -o "$MASTER"
+  elif [[ -f "$ICON_PNG" ]]; then
+    cp "$ICON_PNG" "$MASTER"
+  else
+    echo "Need AppIcon.icns or rsvg-convert / AppIcon.png to build the icon" >&2
+    exit 1
+  fi
+  for pair in 16:icon_16x16 32:diana.k@example.org 32:icon_32x32 64:ivan.p@example.net \
+              128:icon_128x128 256:wendy.h@example.net 256:icon_256x256 512:xavier.y@example.org \
+              512:icon_512x512 1024:hannah.h@example.com; do
+    size="${pair%%:*}"
+    name="${pair##*:}"
+    sips -z "$size" "$size" "$MASTER" --out "$ICONSET/$name.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+  rm -rf "$(dirname "$ICONSET")" "$MASTER"
+else
+  echo "missing AppIcon.icns under $ICON_DIR (run macos/scripts/generate-app-icon.py)" >&2
+  exit 1
+fi
+if [[ -f "$ICON_PNG" ]]; then
+  cp "$ICON_PNG" "$APP/Contents/Resources/AppIcon.png"
+fi
 if [[ -f "$ICON_SVG" ]]; then
   cp "$ICON_SVG" "$APP/Contents/Resources/AppIcon.svg"
-fi
-
-# Optional PNG icon for Finder (SVG alone is not a CFBundleIconFile).
-if command -v rsvg-convert >/dev/null && [[ -f "$ICON_SVG" ]]; then
-  rsvg-convert -w 1024 -h 1024 "$ICON_SVG" \
-    -o "$APP/Contents/Resources/AppIcon.png" || true
 fi
 
 if [[ "$BUILD_CLI" -eq 1 && -z "$CLI_BIN" ]]; then

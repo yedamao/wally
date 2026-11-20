@@ -68,7 +68,23 @@ swift run   # runs the executable outside a .app bundle
 ```
 
 Prefer `build-app.sh` for day-to-day use so `Info.plist`, ATS exceptions
-for loopback HTTP, and the embedded CLI are in place.
+for loopback HTTP, the Dock icon (`AppIcon.icns`), and the embedded CLI
+are in place.
+
+### App icon
+
+The Dock / Finder icon is the same brand mark as the WebUI favicon
+(orange square, dark “wally” face). Sources live under
+`macos/Wally/Sources/Wally/Resources/`:
+
+- `AppIcon.svg` — master artwork (full-bleed; macOS applies the squircle)
+- `AppIcon.icns` / `AppIcon.png` — committed builds for the app bundle
+
+To regenerate after editing the SVG (needs `rsvg-convert` + Pillow):
+
+```sh
+python3 macos/scripts/generate-app-icon.py
+```
 
 ## Structure check (any OS)
 
