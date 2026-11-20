@@ -30,6 +30,8 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         // fullSizeContentView + WKWebView under a transparent title bar
         // steals mouse events and blocks dragging.
         window.titlebarAppearsTransparent = false
+        window.titlebarSeparatorStyle = .none
+        window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -140,6 +142,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         if let toolbar { return toolbar }
         let toolbar = NSToolbar(identifier: "WallyToolbar")
         toolbar.displayMode = .iconOnly
+        toolbar.showsBaselineSeparator = false
         toolbar.delegate = self
         self.toolbar = toolbar
         return toolbar
