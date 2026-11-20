@@ -73,7 +73,13 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
 
         // Pin below the title bar / traffic lights. The strip above stays
         // chromeColor and remains system-draggable.
-        let topAnchor = window.contentLayoutGuide.topAnchor
+        // contentLayoutGuide is typed as Any? on NSWindow; cast to NSLayoutGuide.
+        let topAnchor: NSLayoutYAxisAnchor
+        if let guide = window.contentLayoutGuide as? NSLayoutGuide {
+            topAnchor = guide.topAnchor
+        } else {
+            topAnchor = split.safeAreaLayoutGuide.topAnchor
+        }
         NSLayoutConstraint.activate([
             webContainer.leadingAnchor.constraint(equalTo: split.leadingAnchor),
             webContainer.trailingAnchor.constraint(equalTo: split.trailingAnchor),
