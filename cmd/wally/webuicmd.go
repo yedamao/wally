@@ -152,25 +152,31 @@ func (a *app) webui(ctx context.Context, args []string) error {
 	case healthyUI && !managed:
 		// Attach: an unmanaged gateway (older nanobot-go, or another
 		// config on this port) that this command never stops.
-	case gatewayHealthy(ctx, client, base):
+	case !healthyUI && gatewayHealthy(ctx, client, base) && !managed:
+		// A health-only unmanaged process cannot pick up channels.websocket
+		// without a restart we do not own.
 		return errGatewayWithoutWebUI(base, len(changes) > 0)
-	case !healthyUI && tcpBusy(net.JoinHostPort(browserHost(g.Host), strconv.Itoa(g.Port))):
+	case !healthyUI && !gatewayHealthy(ctx, client, base) && tcpBusy(net.JoinHostPort(browserHost(g.Host), strconv.Itoa(g.Port))):
 		return portConflict(pageURL, base, g.Port)
 	default:
-		// Share a managed gateway through a client lease (start one on
-		// demand when nothing is serving yet).
+		// Share a managed gateway through a client lease: attach when it
+		// already serves the WebUI, start one on demand when nothing is
+		// listening, or restart a managed gateway that is up without /ui/
+		// (or whose WebUI config just changed).
 		lease := gwrt.NewClientLease("webui")
 		if err := lease.Acquire(); err != nil {
 			return err
 		}
 		defer a.releaseWebUILease(lease, stopWait(path, 0))
 		opts := gatewayruntime.StartOptions{Port: g.Port, Verbose: flags.verbose}
-		need := !healthyUI || (managed && len(changes) > 0)
-		if need {
-			if !healthyUI {
+		needRestart := !healthyUI || len(changes) > 0
+		if needRestart {
+			if !healthyUI && gatewayHealthy(ctx, client, base) {
+				fmt.Fprintln(a.stdout, "Gateway is running without the WebUI; restarting it…")
+			} else if !healthyUI {
 				fmt.Fprintln(a.stdout, "Starting the gateway...")
 			}
-			started, err = a.ensureWebUIGateway(ctx, gwrt, lease, opts, client, base, pageURL, path, len(changes) > 0)
+			started, err = a.ensureWebUIGateway(ctx, gwrt, lease, opts, client, base, pageURL, path, needRestart)
 			if err != nil {
 				return err
 			}
@@ -218,14 +224,16 @@ func errGatewayWithoutWebUI(base string, configUpdated bool) error {
 // ensureWebUIGateway starts or restarts the shared gateway for a webui
 // lease and waits until /healthz and /ui/ answer. started is true when
 // this call launched a new process (not only attached/restarted).
-func (a *app) ensureWebUIGateway(ctx context.Context, rt *gatewayruntime.Runtime, lease *gatewayruntime.ClientLease, opts gatewayruntime.StartOptions, client *http.Client, base, pageURL, path string, changed bool) (started bool, err error) {
+// When restartIfRunning is set and a gateway is already up (for example
+// without /ui/, or after enabling channels.websocket), it is restarted.
+func (a *app) ensureWebUIGateway(ctx context.Context, rt *gatewayruntime.Runtime, lease *gatewayruntime.ClientLease, opts gatewayruntime.StartOptions, client *http.Client, base, pageURL, path string, restartIfRunning bool) (started bool, err error) {
 	res, err := lease.EnsureOnDemand(opts)
 	if err != nil {
 		return false, err
 	}
 	restarted := false
-	if !res.OK && res.Message == gatewayruntime.MsgAlreadyRunning && changed {
-		fmt.Fprintln(a.stdout, "WebUI config changed; restarting the background gateway.")
+	if !res.OK && res.Message == gatewayruntime.MsgAlreadyRunning && restartIfRunning {
+		fmt.Fprintln(a.stdout, "Restarting the background gateway for the WebUI.")
 		res, err = rt.Restart(opts, stopWait(path, 0))
 		restarted = true
 		if err != nil {
