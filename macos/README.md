@@ -54,6 +54,10 @@ The app looks for a `wally` (or `nanobot`) binary in this order:
 Menus: **Reload WebUI** (⌘R), **Open in Browser** (⇧⌘O), **Show Logs**
 (⌘L), **Restart Gateway** (⇧⌘R).
 
+The native title bar / toolbar follow the WebUI theme (light / dark /
+system): when Appearance changes in the page, the window chrome updates
+to match `--bg-1`.
+
 ## Develop the Swift sources
 
 ```sh

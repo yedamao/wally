@@ -11,10 +11,16 @@ final class StatusOverlayView: NSView {
     private let configButton = NSButton(title: "Open Config Folder", target: nil, action: nil)
     private var onRetry: (() -> Void)?
 
+    func applyTheme(_ theme: AppTheme) {
+        wantsLayer = true
+        layer?.backgroundColor = theme.canvasColor.cgColor
+        needsDisplay = true
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        layer?.backgroundColor = AppTheme.system.canvasColor.cgColor
 
         titleLabel.font = .systemFont(ofSize: 34, weight: .semibold)
         titleLabel.alignment = .center

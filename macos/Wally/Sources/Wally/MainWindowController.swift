@@ -1,8 +1,9 @@
 import AppKit
 import WebKit
 
-final class MainWindowController: NSWindowController, GatewayControllerDelegate, NSWindowDelegate {
+final class MainWindowController: NSWindowController, GatewayControllerDelegate, NSWindowDelegate, ThemeBridgeDelegate {
     private let gateway: GatewayController
+    private let themeBridge = ThemeBridge()
     private let root = NSView()
     private let overlay = StatusOverlayView()
     private let webContainer = NSView()
@@ -14,6 +15,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private var logsObserver: NSObjectProtocol?
     private var loadedURL: URL?
     private var didConfigureToolbar = false
+    private var theme: AppTheme = .system
 
     init(gateway: GatewayController) {
         self.gateway = gateway
@@ -31,9 +33,10 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
-        window.backgroundColor = .windowBackgroundColor
         super.init(window: window)
         window.delegate = self
+        themeBridge.delegate = self
+        applyTheme(AppTheme.system)
         installContent(in: window)
         gateway.delegate = self
         installObservers()
@@ -47,9 +50,27 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     }
 
     deinit {
+        if let controller = webView?.configuration.userContentController {
+            controller.removeScriptMessageHandler(forName: ThemeBridge.handlerName)
+        }
         for obs in [reloadObserver, openObserver, restartObserver, logsObserver].compactMap({ $0 }) {
             NotificationCenter.default.removeObserver(obs)
         }
+    }
+
+    func themeBridgeDidResolve(_ theme: AppTheme) {
+        applyTheme(theme)
+    }
+
+    private func applyTheme(_ theme: AppTheme) {
+        self.theme = theme
+        guard let window else { return }
+        window.appearance = theme.appearance
+        window.backgroundColor = theme.chromeColor
+        root.layer?.backgroundColor = theme.chromeColor.cgColor
+        webContainer.layer?.backgroundColor = theme.canvasColor.cgColor
+        overlay.applyTheme(theme)
+        LaunchLog.write("theme=\(theme.rawValue)")
     }
 
     func present() {
@@ -77,10 +98,13 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         guard let content = window.contentView else { return }
 
         root.wantsLayer = true
-        root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        root.layer?.backgroundColor = theme.chromeColor.cgColor
+        webContainer.wantsLayer = true
+        webContainer.layer?.backgroundColor = theme.canvasColor.cgColor
         root.translatesAutoresizingMaskIntoConstraints = false
         webContainer.translatesAutoresizingMaskIntoConstraints = false
         overlay.translatesAutoresizingMaskIntoConstraints = false
+        overlay.applyTheme(theme)
 
         content.addSubview(root)
         root.addSubview(webContainer)
@@ -153,6 +177,9 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private func ensureWebView() {
         if webView != nil { return }
         let config = WKWebViewConfiguration()
+        let uc = config.userContentController
+        uc.add(themeBridge, name: ThemeBridge.handlerName)
+        uc.addUserScript(ThemeBridge.userScript)
         let view = WKWebView(frame: .zero, configuration: config)
         view.navigationDelegate = self
         view.uiDelegate = self
@@ -266,6 +293,13 @@ extension NSToolbarItem.Identifier {
 }
 
 extension MainWindowController: WKNavigationDelegate, WKUIDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Re-post theme after navigation in case the injected script raced.
+        webView.evaluateJavaScript(
+            "(function(){try{var t=document.documentElement.getAttribute('data-theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.wallyTheme){window.webkit.messageHandlers.wallyTheme.postMessage(t)}}catch(e){}})()"
+        )
+    }
+
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
