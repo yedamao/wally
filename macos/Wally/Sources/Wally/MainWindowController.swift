@@ -6,7 +6,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private let split = NSView()
     private let overlay = StatusOverlayView()
     private let webContainer = NSView()
-    private var webView: DraggableWebView?
+    private var webView: WKWebView?
     private var toolbar: NSToolbar?
     private var reloadObserver: NSObjectProtocol?
     private var openObserver: NSObjectProtocol?
@@ -15,7 +15,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private var loadedURL: URL?
     private var didConfigureToolbar = false
 
-    /// Matches WebUI --bg-1 so the transparent title bar does not flash a seam.
+    /// Matches WebUI --bg-1 so the transparent title bar blends with the sidebar.
     private let chromeColor = NSColor(calibratedRed: 12 / 255, green: 12 / 255, blue: 14 / 255, alpha: 1)
 
     init(gateway: GatewayController) {
@@ -29,9 +29,9 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         window.title = "Wally"
         window.minSize = NSSize(width: 960, height: 640)
         window.center()
-        // Seamless chrome: WebUI draws under a transparent title bar so
-        // there is no opaque native strip / separator above the page.
-        // DraggableWebView restores click-drag on the top content area.
+        // Transparent title bar (no separator band). The WebView is pinned
+        // to contentLayoutGuide so it clears the traffic lights — CSS
+        // injection cannot pad the page because the WebUI CSP blocks it.
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
@@ -42,7 +42,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
-        window.contentView = buildContent()
+        window.contentView = buildContent(in: window)
         gateway.delegate = self
         installObservers()
         render(gateway)
@@ -63,21 +63,25 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         render(controller)
     }
 
-    private func buildContent() -> NSView {
+    private func buildContent(in window: NSWindow) -> NSView {
         split.wantsLayer = true
         split.layer?.backgroundColor = chromeColor.cgColor
         webContainer.translatesAutoresizingMaskIntoConstraints = false
         overlay.translatesAutoresizingMaskIntoConstraints = false
         split.addSubview(webContainer)
         split.addSubview(overlay)
+
+        // Pin below the title bar / traffic lights. The strip above stays
+        // chromeColor and remains system-draggable.
+        let topAnchor = window.contentLayoutGuide.topAnchor
         NSLayoutConstraint.activate([
             webContainer.leadingAnchor.constraint(equalTo: split.leadingAnchor),
             webContainer.trailingAnchor.constraint(equalTo: split.trailingAnchor),
-            webContainer.topAnchor.constraint(equalTo: split.topAnchor),
+            webContainer.topAnchor.constraint(equalTo: topAnchor),
             webContainer.bottomAnchor.constraint(equalTo: split.bottomAnchor),
             overlay.leadingAnchor.constraint(equalTo: split.leadingAnchor),
             overlay.trailingAnchor.constraint(equalTo: split.trailingAnchor),
-            overlay.topAnchor.constraint(equalTo: split.topAnchor),
+            overlay.topAnchor.constraint(equalTo: topAnchor),
             overlay.bottomAnchor.constraint(equalTo: split.bottomAnchor),
         ])
         return split
@@ -130,8 +134,7 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
     private func ensureWebView() {
         if webView != nil { return }
         let config = WKWebViewConfiguration()
-        config.userContentController.addUserScript(Self.chromeInsetScript)
-        let view = DraggableWebView(frame: .zero, configuration: config)
+        let view = WKWebView(frame: .zero, configuration: config)
         view.navigationDelegate = self
         view.uiDelegate = self
         view.allowsBackForwardNavigationGestures = true
@@ -146,31 +149,6 @@ final class MainWindowController: NSWindowController, GatewayControllerDelegate,
         ])
         webView = view
     }
-
-    /// Pads the WebUI brand/topbar under the traffic lights so content is
-    /// not obscured and the top strip can be used to drag the window.
-    private static let chromeInsetScript: WKUserScript = {
-        let source = """
-        (function () {
-          if (document.documentElement.dataset.wallyMacChrome === "1") return;
-          document.documentElement.dataset.wallyMacChrome = "1";
-          var css = document.createElement("style");
-          css.textContent = `
-            :root { --wally-mac-titlebar: 28px; }
-            .brand { padding-top: calc(14px + var(--wally-mac-titlebar)) !important; }
-            .topbar {
-              height: calc(56px + var(--wally-mac-titlebar)) !important;
-              padding-top: var(--wally-mac-titlebar) !important;
-              box-sizing: border-box !important;
-            }
-            .settings-nav .brand { padding-top: calc(14px + var(--wally-mac-titlebar)) !important; }
-            .login-card { margin-top: var(--wally-mac-titlebar); }
-          `;
-          (document.head || document.documentElement).appendChild(css);
-        })();
-        """
-        return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-    }()
 
     private func makeToolbar() -> NSToolbar {
         if let toolbar { return toolbar }
