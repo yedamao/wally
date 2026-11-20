@@ -40,15 +40,16 @@ The app looks for a `wally` (or `nanobot`) binary in this order:
 
 ## How it works
 
-1. On launch, the app starts `wally webui --yes --no-open`.
-2. That command enables the websocket channel if needed, attaches to a
-   running gateway or starts an on-demand one (shared lease), and keeps
-   the lease until the app quits.
-3. The window loads `http://127.0.0.1:<gateway.port>/ui/` (default port
-   **18790**, or whatever is in `~/.nanobot-go/config.json`).
-4. Quitting the app terminates `wally webui`, which releases the lease
-   (an on-demand gateway stops when no clients remain; a
-   `gateway service install` / `gateway --background` gateway stays up).
+1. On launch, the app probes `http://127.0.0.1:<port>/ui/`. If a gateway
+   already serves the WebUI, it attaches and does **not** start or stop
+   that process.
+2. Otherwise it runs `wally webui --yes --no-open`, which enables the
+   websocket channel if needed, attaches to a managed gateway, starts an
+   on-demand one, or restarts a managed gateway that was up without `/ui/`.
+3. The window loads `/ui/` (default port **18790**, or whatever is in
+   `~/.nanobot-go/config.json`).
+4. Quitting stops only a `wally webui` child this app started (releasing
+   its lease). An already-running gateway is left alone.
 
 Menus: **Reload WebUI** (⌘R), **Open in Browser** (⇧⌘O), **Show Logs**
 (⌘L), **Restart Gateway** (⇧⌘R).

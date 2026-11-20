@@ -21,6 +21,7 @@ import (
 
 	wschan "github.com/yedamao/wally/internal/channels/websocket"
 	"github.com/yedamao/wally/internal/config"
+	"github.com/yedamao/wally/internal/gatewayruntime"
 )
 
 // fakeGateway serves /healthz and, with ui, /ui/ on a loopback port.
@@ -439,6 +440,54 @@ func TestWebUICreatesConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(e.workspace, "AGENTS.md")); err != nil {
 		t.Errorf("workspace not bootstrapped: %v", err)
+	}
+}
+
+// TestWebUIAttachManaged reuses a managed gateway that already serves
+// the WebUI (state file present). Previously this hit the "without the
+// WebUI" branch because healthyUI&&managed fell through to gatewayHealthy.
+func TestWebUIAttachManaged(t *testing.T) {
+	e := newTestEnv(t)
+	port := fakeGateway(t, true)
+	e.writeWebUIConfig(t, port, true)
+	inst, err := gatewayruntime.Resolve(e.configPath, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(inst.Paths.RunDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	st := gatewayruntime.State{
+		PID:        os.Getpid(),
+		Host:       "127.0.0.1",
+		Port:       port,
+		LaunchMode: gatewayruntime.LaunchBackground,
+		StartedAt:  time.Now().UTC().Format(time.RFC3339),
+	}
+	data, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(inst.Paths.StatePath, append(data, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r := e.startWebUI(t, e.app(nil))
+	if url, want := r.waitOpened(t, e), localURL("127.0.0.1", port, "/ui/"); url != want {
+		t.Errorf("opened %s, want %s", url, want)
+	}
+	e.interrupts <- os.Interrupt
+	if code := r.waitExit(t, e); code != 0 {
+		t.Fatalf("exit = %d, stderr %s, stdout %s", code, e.stderr, e.stdout)
+	}
+	if strings.Contains(e.stderr.String(), "without the WebUI") {
+		t.Errorf("managed WebUI gateway was rejected: %s", e.stderr)
+	}
+	if !strings.Contains(e.stdout.String(), "already running") {
+		t.Errorf("stdout: %s", e.stdout)
+	}
+	if !gatewayHealthy(context.Background(), http.DefaultClient, localURL("127.0.0.1", port, "")) {
+		t.Error("webui stopped a managed gateway it attached to")
 	}
 }
 

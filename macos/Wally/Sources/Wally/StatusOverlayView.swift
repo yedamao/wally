@@ -88,9 +88,9 @@ final class StatusOverlayView: NSView {
         spinner.startAnimation(nil)
         switch phase {
         case .locatingBinary:
-            statusLabel.stringValue = "Looking for the wally binary…"
+            statusLabel.stringValue = "Looking for a local gateway…"
         case .starting:
-            statusLabel.stringValue = "Starting the local gateway and WebUI…"
+            statusLabel.stringValue = "Starting or attaching to the WebUI…"
         default:
             statusLabel.stringValue = "Preparing…"
         }

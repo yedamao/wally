@@ -22,6 +22,8 @@ final class GatewayController {
     private(set) var pageURL: URL?
     private(set) var binaryPath: String?
     private(set) var logTail: String = ""
+    /// True when this app started `wally webui` and should stop it on quit.
+    private(set) var ownsProcess = false
     var preferBundledBinary = true
 
     private var process: Process?
@@ -50,8 +52,9 @@ final class GatewayController {
         if let terminateObserver {
             NotificationCenter.default.removeObserver(terminateObserver)
         }
-        // Terminate without touching MainActor / delegate.
-        killProcess()
+        if ownsProcess {
+            killProcess()
+        }
     }
 
     func start() {
@@ -133,6 +136,19 @@ final class GatewayController {
     private func startLocked() {
         guard phase != .starting, phase != .ready else { return }
         setPhase(.locatingBinary, url: nil, clearLog: true)
+        ownsProcess = false
+
+        let page = pageURLCandidate()
+        let health = healthURLCandidate()
+
+        // Reuse a gateway that already serves the WebUI — do not spawn
+        // another `wally webui` or take ownership of that process.
+        if ping(health), ping(page) {
+            binaryPath = resolveBinary()
+            appendLog("Attached to an already-running gateway at \(page.absoluteString)\n")
+            setPhase(.ready, url: page)
+            return
+        }
 
         guard let binary = resolveBinary() else {
             setPhase(
@@ -152,6 +168,7 @@ final class GatewayController {
 
         do {
             try launchWebUI(binary: binary)
+            ownsProcess = true
         } catch {
             setPhase(.failed("Failed to start wally: \(error.localizedDescription)"), url: nil)
             return
@@ -163,7 +180,10 @@ final class GatewayController {
     private func stopLocked() {
         readinessWorkItem?.cancel()
         readinessWorkItem = nil
-        killProcess()
+        if ownsProcess {
+            killProcess()
+        }
+        ownsProcess = false
         if phase == .ready || phase == .starting {
             setPhase(.idle, url: nil)
         } else {
@@ -228,6 +248,7 @@ final class GatewayController {
                 guard let self else { return }
                 if self.process == process {
                     self.process = nil
+                    self.ownsProcess = false
                     if self.phase == .ready || self.phase == .starting {
                         let code = process.terminationStatus
                         self.setPhase(
@@ -266,12 +287,17 @@ final class GatewayController {
         notify()
     }
 
+    private func pageURLCandidate() -> URL {
+        URL(string: "http://\(resolvedHost()):\(resolvedPort())/ui/")!
+    }
+
+    private func healthURLCandidate() -> URL {
+        URL(string: "http://\(resolvedHost()):\(resolvedPort())/healthz")!
+    }
+
     private func waitUntilReady() {
-        let port = resolvedPort()
-        let host = resolvedHost()
-        let base = URL(string: "http://\(host):\(port)")!
-        let page = base.appendingPathComponent("ui/")
-        let health = base.appendingPathComponent("healthz")
+        let page = pageURLCandidate()
+        let health = healthURLCandidate()
         let deadline = Date().addingTimeInterval(readyTimeout)
 
         let work = DispatchWorkItem { [weak self] in
@@ -283,7 +309,7 @@ final class GatewayController {
 
     private func pollReady(page: URL, health: URL, deadline: Date) {
         if readinessWorkItem?.isCancelled == true { return }
-        if process?.isRunning != true {
+        if ownsProcess, process?.isRunning != true {
             if phase == .starting {
                 setPhase(
                     .failed(
@@ -310,7 +336,10 @@ final class GatewayController {
                 ),
                 url: nil
             )
-            killProcess()
+            if ownsProcess {
+                killProcess()
+                ownsProcess = false
+            }
             return
         }
         let work = DispatchWorkItem { [weak self] in
